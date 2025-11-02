@@ -49,6 +49,9 @@ class InstallCommand extends Command
         // Registrar ServiceProvider
         $this->registerServiceProvider();
 
+        // Verificar y configurar paneles de Filament
+        $this->checkAndConfigureFilamentPanels();
+
         // Registrar middlewares en bootstrap/app.php (Laravel 11)
         $this->registerMiddlewares();
 
@@ -998,6 +1001,120 @@ class InstallCommand extends Command
             $this->warn('  ⚠ No se pudo registrar la vista 404 automáticamente.');
             $this->line('  Puedes agregarla manualmente en bootstrap/app.php en el bloque withExceptions.');
         }
+    }
+
+    /**
+     * Verifica y configura los paneles de Filament.
+     */
+    protected function checkAndConfigureFilamentPanels(): void
+    {
+        $this->info('🔍 Verificando paneles de Filament...');
+
+        // Verificar si Filament está disponible
+        if (!class_exists(\Filament\Facades\Filament::class)) {
+            $this->line('  ℹ Filament no está disponible. Los paneles se verificarán después de instalar Filament.');
+            $this->newLine();
+            return;
+        }
+
+        $panelProvidersPath = app_path('Providers/Filament');
+        $landlordPanelId = config('filament-tenancy.filament.landlord_panel_id', 'admin');
+        $tenantPanelId = config('filament-tenancy.filament.tenant_panel_id', 'tenant');
+
+        $foundPanels = [];
+        $landlordPanelFound = false;
+        $tenantPanelFound = false;
+
+        // Buscar PanelProviders
+        if (File::exists($panelProvidersPath)) {
+            $providers = glob($panelProvidersPath . '/*PanelProvider.php');
+            
+            foreach ($providers as $providerFile) {
+                $content = File::get($providerFile);
+                
+                // Extraer el ID del panel buscando ->id('...')
+                if (preg_match("/->id\(['\"]([^'\"]+)['\"]\)/", $content, $matches)) {
+                    $panelId = $matches[1];
+                    $foundPanels[] = [
+                        'id' => $panelId,
+                        'file' => basename($providerFile),
+                    ];
+
+                    // Verificar si es el panel landlord
+                    if ($panelId === $landlordPanelId || str_contains(strtolower($panelId), 'admin')) {
+                        $landlordPanelFound = true;
+                        $this->line("  ✓ Panel landlord encontrado: <fg=green>{$panelId}</fg=green> ({$panelId}PanelProvider.php)");
+                        
+                        // Verificar si tiene el plugin configurado
+                        if (!str_contains($content, 'TenancyLandlordPlugin') && !str_contains($content, 'LandlordPlugin')) {
+                            $this->warn("  ⚠ El panel <fg=yellow>{$panelId}</fg=yellow> no tiene TenancyLandlordPlugin configurado.");
+                            $this->line("  Agrega: ->plugin(\\AngelitoSystems\\FilamentTenancy\\FilamentPlugins\\TenancyLandlordPlugin::make())");
+                        } else {
+                            $this->line("  ✓ TenancyLandlordPlugin está configurado en el panel <fg=green>{$panelId}</fg=green>");
+                        }
+                    }
+                    
+                    // Verificar si es el panel tenant
+                    if ($panelId === $tenantPanelId || str_contains(strtolower($panelId), 'tenant')) {
+                        $tenantPanelFound = true;
+                        $this->line("  ✓ Panel tenant encontrado: <fg=green>{$panelId}</fg=green> ({$panelId}PanelProvider.php)");
+                        
+                        // Verificar si tiene el plugin configurado
+                        if (!str_contains($content, 'TenancyTenantPlugin') && !str_contains($content, 'TenantPlugin')) {
+                            $this->warn("  ⚠ El panel <fg=yellow>{$panelId}</fg=yellow> no tiene TenancyTenantPlugin configurado.");
+                            $this->line("  Agrega: ->plugin(\\AngelitoSystems\\FilamentTenancy\\FilamentPlugins\\TenancyTenantPlugin::make())");
+                        } else {
+                            $this->line("  ✓ TenancyTenantPlugin está configurado en el panel <fg=green>{$panelId}</fg=green>");
+                        }
+                    }
+                }
+            }
+        }
+
+        // Si no se encontraron paneles específicos, buscar otros paneles
+        if (empty($foundPanels)) {
+            $this->line('  ℹ No se encontraron paneles de Filament en <fg=yellow>app/Providers/Filament/</fg=yellow>');
+            $this->line('  Los paneles se configurarán automáticamente cuando uses los plugins.');
+        } else {
+            // Mostrar paneles encontrados que no son landlord ni tenant
+            $otherPanels = array_filter($foundPanels, function ($panel) use ($landlordPanelId, $tenantPanelId) {
+                return $panel['id'] !== $landlordPanelId && 
+                       $panel['id'] !== $tenantPanelId &&
+                       !str_contains(strtolower($panel['id']), 'admin') &&
+                       !str_contains(strtolower($panel['id']), 'tenant');
+            });
+
+            foreach ($otherPanels as $panel) {
+                $this->line("  ℹ Panel encontrado: <fg=cyan>{$panel['id']}</fg=cyan> ({$panel['file']})");
+            }
+        }
+
+        // Resumen de seguridad
+        $this->newLine();
+        $this->info('🔒 Configuración de seguridad de paneles:');
+        
+        if ($landlordPanelFound) {
+            $this->line('  ✓ Panel admin/landlord: Bloqueado para acceso desde contexto tenant');
+            $this->line('    → El middleware PreventTenantAccess previene acceso cuando hay tenant activo');
+        } else {
+            $this->warn('  ⚠ Panel admin/landlord no encontrado');
+            $this->line('    → Crea un panel con id "admin" o similar y agrega TenancyLandlordPlugin');
+        }
+
+        if ($tenantPanelFound) {
+            $this->line('  ✓ Panel tenant: Bloqueado para acceso sin tenant activo');
+            $this->line('    → El middleware PreventLandlordAccess previene acceso sin tenant');
+        } else {
+            $this->warn('  ⚠ Panel tenant no encontrado');
+            $this->line('    → Crea un panel con id "tenant" o similar y agrega TenancyTenantPlugin');
+        }
+
+        $this->newLine();
+        $this->line('  📝 Recordatorio:');
+        $this->line('    • El panel admin solo es accesible desde dominios centrales sin tenant');
+        $this->line('    • El panel tenant solo es accesible cuando hay un tenant resuelto');
+        $this->line('    • Los middlewares se aplican automáticamente cuando usas los plugins');
+        $this->newLine();
     }
 
     /**

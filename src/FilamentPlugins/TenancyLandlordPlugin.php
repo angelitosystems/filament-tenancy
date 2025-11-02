@@ -4,11 +4,12 @@ namespace AngelitoSystems\FilamentTenancy\FilamentPlugins;
 
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
+use AngelitoSystems\FilamentTenancy\Middleware\PreventTenantAccess;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 
-class LandlordPlugin implements Plugin
+class TenancyLandlordPlugin implements Plugin
 {
     protected bool $autoRegister = true;
     protected array $middleware = [];
@@ -33,8 +34,10 @@ class LandlordPlugin implements Plugin
     public function register(Panel $panel): void
     {
         // Add tenancy middleware (but not tenant access enforcement)
+        // PreventTenantAccess ensures admin panel cannot be accessed when tenant is active
         $panel->middleware([
             InitializeTenancy::class,
+            PreventTenantAccess::class,
             ...$this->middleware,
         ]);
 
@@ -153,3 +156,4 @@ class LandlordPlugin implements Plugin
         return null;
     }
 }
+

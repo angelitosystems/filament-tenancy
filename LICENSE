@@ -1,56 +1,43 @@
-MIT License
+MIT License with Additional Restrictions
 
 Copyright (c) 2024 Angelito Systems
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+in the Software subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. USAGE RIGHTS:
+   - ✅ You MAY use the Software in your projects (personal, commercial, educational)
+   - ✅ You MAY install and use the package via Composer
+   - ✅ You MAY customize configurations and extend functionality within your projects
+   - ✅ You MAY modify the Software for internal use only (within your own projects, not for redistribution)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. PROHIBITED ACTIONS:
+   - ❌ You MAY NOT create replicas, forks, or copies of this Software for redistribution
+   - ❌ You MAY NOT redistribute this Software as your own or under a different name
+   - ❌ You MAY NOT remove or modify license headers or copyright notices
+   - ❌ You MAY NOT use this Software to create competing multi-tenancy solutions
+   - ❌ You MAY NOT publish, distribute, sublicense, or sell modified versions of this Software
+   - ❌ You MAY NOT merge this Software into other packages or solutions for redistribution
 
----
+3. COPYRIGHT NOTICE:
+   The above copyright notice and this permission notice (including all restrictions)
+   shall be included in all copies or substantial portions of the Software.
 
-ADDITIONAL TERMS AND RESTRICTIONS:
-
-In addition to the MIT license terms above, the following restrictions and terms apply:
-
-1. PROHIBITED ACTIONS:
-   - ❌ You CANNOT create replicas, forks, or copies of this Software
-   - ❌ You CANNOT redistribute this Software as your own
-   - ❌ You CANNOT remove or modify license headers or copyright notices
-   - ❌ You CANNOT use this Software to create competing multi-tenancy solutions
-   - ❌ You CANNOT publish modified versions of this Software under a different name
-
-2. PERMITTED USAGE:
-   - ✅ You CAN use this Software in your projects (personal, commercial, educational)
-   - ✅ You CAN install and use the package via Composer
-   - ✅ You CAN customize configurations and extend functionality within your projects
-   - ✅ You CAN modify the Software for internal use only (not for redistribution)
-
-3. LICENSE COMPLIANCE:
+4. LICENSE COMPLIANCE:
    - You must use the Software via the official Composer repository only
    - You must respect intellectual property rights
+   - Modifications are permitted only for internal use within your own projects
+   - Any redistribution, publication, or distribution of modified versions is strictly prohibited
    - You must contact the copyright holder for licensing inquiries: angelitosystems@gmail.com
 
-4. FUTURE LICENSING MODEL:
+5. FUTURE LICENSING MODEL:
    - This Software will transition to a paid license model in the future
    - Commercial use may require a valid license in future versions
    - Early adopters will receive preferential treatment when licensing becomes available
    - Current public access is temporary and subject to change
 
-5. CONSEQUENCES OF NON-COMPLIANCE:
+6. CONSEQUENCES OF NON-COMPLIANCE:
 
    **Legal Consequences**:
    - Violation of these terms may result in legal action for copyright infringement
@@ -64,11 +51,14 @@ In addition to the MIT license terms above, the following restrictions and terms
    - Support will not be provided to users who violate these terms
    - Access to future versions may be restricted
 
-6. NO WARRANTIES:
-   - The Software is provided "as is", without warranties of any kind
-   - The author shall not be liable for any direct, indirect, incidental, special,
-     exemplary, or consequential damages resulting from the use or inability to use
-     the Software
+7. NO WARRANTIES:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
 
 ---
 
@@ -77,15 +67,17 @@ SUMMARY:
 **What you CAN do**:
 - ✅ Use it in your projects (personal or commercial)
 - ✅ Install via Composer
-- ✅ Customize for internal use
+- ✅ Customize for internal use within your projects
 - ✅ Extend functionality within your projects
+- ✅ Modify for internal use only
 
 **What you CANNOT do**:
-- ❌ Create replicas, forks, or copies
-- ❌ Redistribute as your own
+- ❌ Create replicas, forks, or copies for redistribution
+- ❌ Redistribute as your own or under a different name
 - ❌ Remove license headers
 - ❌ Create competing solutions
-- ❌ Publish modified versions
+- ❌ Publish, distribute, or sell modified versions
+- ❌ Merge into other packages for redistribution
 
 **Important**: This package will transition to a paid license model. Non-compliance with these terms may result in legal and technical consequences.
 

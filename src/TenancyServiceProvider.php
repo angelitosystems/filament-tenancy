@@ -9,8 +9,8 @@ use AngelitoSystems\FilamentTenancy\Commands\ListTenantsCommand;
 use AngelitoSystems\FilamentTenancy\Commands\MigrateTenantCommand;
 use AngelitoSystems\FilamentTenancy\Commands\MonitorConnectionsCommand;
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
-use AngelitoSystems\FilamentTenancy\FilamentPlugins\LandlordPlugin;
-use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenantPlugin;
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyLandlordPlugin;
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
 use AngelitoSystems\FilamentTenancy\Middleware\EnsureTenantAccess;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventAccessFromCentralDomains;
@@ -221,9 +221,9 @@ class TenancyServiceProvider extends ServiceProvider
                 $landlordPanelId = config('filament-tenancy.filament.landlord_panel_id', 'admin');
 
                 if ($panelId === $tenantPanelId) {
-                    $panel->plugin(TenantPlugin::make());
+                    $panel->plugin(TenancyTenantPlugin::make());
                 } elseif ($panelId === $landlordPanelId) {
-                    $panel->plugin(LandlordPlugin::make());
+                    $panel->plugin(TenancyLandlordPlugin::make());
                 }
             });
         }

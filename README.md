@@ -274,14 +274,14 @@ Create a landlord panel for managing tenants:
 
 ```php
 // app/Providers/Filament/AdminPanelProvider.php
-use AngelitoSystems\FilamentTenancy\FilamentPlugins\LandlordPlugin;
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyLandlordPlugin;
 
 public function panel(Panel $panel): Panel
 {
     return $panel
         ->id('admin')
         ->path('/admin')
-        ->plugin(LandlordPlugin::make())
+        ->plugin(TenancyLandlordPlugin::make())
         // ... other panel configuration
 }
 ```
@@ -292,14 +292,14 @@ Create a tenant panel:
 
 ```php
 // app/Providers/Filament/TenantPanelProvider.php
-use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenantPlugin;
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
 
 public function panel(Panel $panel): Panel
 {
     return $panel
         ->id('tenant')
         ->path('/admin')
-        ->plugin(TenantPlugin::make())
+        ->plugin(TenancyTenantPlugin::make())
         // ... other panel configuration
 }
 ```
