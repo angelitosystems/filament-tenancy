@@ -1,0 +1,52 @@
+# Excluir archivos de tests
+/tests export-ignore
+/phpunit.xml export-ignore
+/run-tests.php export-ignore
+/.phpunit.cache export-ignore
+
+# Excluir archivos de build y desarrollo
+/build export-ignore
+/coverage export-ignore
+*.log export-ignore
+
+# Excluir archivos de Git
+/.git export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+
+# Excluir archivos de IDE
+/.idea export-ignore
+/.vscode export-ignore
+/.vs export-ignore
+*.swp export-ignore
+*.swo export-ignore
+*.sublime-project export-ignore
+*.sublime-workspace export-ignore
+.phpstorm.meta.php export-ignore
+_ide_helper.php export-ignore
+_ide_helper_models.php export-ignore
+
+# Excluir documentación
+/docs export-ignore
+
+# Excluir archivos del sistema operativo
+.DS_Store export-ignore
+Thumbs.db export-ignore
+.AppleDouble export-ignore
+.LSOverride export-ignore
+
+# Excluir archivos temporales
+*.tmp export-ignore
+*.temp export-ignore
+*.bak export-ignore
+*.backup export-ignore
+
+# Excluir composer.lock (debe estar en .gitignore también)
+composer.lock export-ignore
+
+# Incluir archivos necesarios explícitamente
+/LICENSE export-include
+/README.md export-include
+/CHANGELOG.md export-include
+composer.json export-include
+

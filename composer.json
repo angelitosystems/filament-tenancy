@@ -59,5 +59,28 @@
     "test-coverage": "vendor/bin/phpunit --coverage-html build/coverage",
     "test-unit": "vendor/bin/phpunit --testsuite=Unit",
     "test-integration": "vendor/bin/phpunit --testsuite=Integration"
+  },
+  "archive": {
+    "exclude": [
+      "/tests",
+      "/docs",
+      "/.phpunit.cache",
+      "/build",
+      "/coverage",
+      "/.git",
+      "/.idea",
+      "/.vscode",
+      "/.vs",
+      "*.log",
+      "*.swp",
+      "*.swo",
+      ".DS_Store",
+      "Thumbs.db",
+      "phpunit.xml",
+      "run-tests.php",
+      ".phpstorm.meta.php",
+      "_ide_helper.php",
+      "_ide_helper_models.php"
+    ]
   }
 }

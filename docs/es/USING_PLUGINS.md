@@ -100,6 +100,8 @@ El plugin agrega automáticamente estos middlewares:
 1. **InitializeTenancy**: Resuelve el tenant desde el dominio/subdominio
 2. **PreventTenantAccess**: Bloquea el acceso si hay un tenant activo (garantiza acceso solo desde dominios centrales)
 
+**⚠️ Importante**: Estos middlewares solo se aplican a las rutas del panel de Filament. Si tienes rutas fuera de Filament (API, rutas web normales, etc.) que necesitan resolución de tenant, debes registrar `InitializeTenancy` en `bootstrap/app.php`. Sin embargo, si solo usas paneles de Filament, el middleware en `bootstrap/app.php` es opcional.
+
 ### Restricciones de Acceso
 
 El panel admin/landlord tiene las siguientes restricciones:
@@ -209,6 +211,8 @@ El plugin agrega automáticamente estos middlewares:
 2. **EnsureTenantAccess**: Verifica que el tenant esté activo y no expirado
 3. **PreventLandlordAccess**: Bloquea el acceso si no hay tenant activo
 
+**⚠️ Importante**: Estos middlewares solo se aplican a las rutas del panel de Filament. Si tienes rutas fuera de Filament (API, rutas web normales, etc.) que necesitan resolución de tenant, debes registrar `InitializeTenancy` en `bootstrap/app.php`. Sin embargo, si solo usas paneles de Filament, el middleware en `bootstrap/app.php` es opcional.
+
 ### Restricciones de Acceso
 
 El panel tenant tiene las siguientes restricciones:
@@ -256,6 +260,49 @@ Puedes cambiar estos valores en `config/filament-tenancy.php`:
 ```
 
 Si tienes IDs diferentes, actualiza la configuración antes de usar los plugins.
+
+## Middleware en bootstrap/app.php
+
+### ¿Es Necesario?
+
+**Respuesta corta**: Depende de si tienes rutas fuera de Filament.
+
+### Cuándo NO es necesario
+
+Si **solo usas paneles de Filament** (no tienes rutas API, rutas web normales, etc.), **NO necesitas** registrar `InitializeTenancy` en `bootstrap/app.php` porque los plugins ya lo incluyen automáticamente para sus rutas.
+
+### Cuándo SÍ es necesario
+
+Si tienes rutas fuera de Filament que necesitan resolución de tenant, **SÍ necesitas** registrar el middleware en `bootstrap/app.php`:
+
+**Ejemplos de rutas que necesitan el middleware global:**
+- Rutas de API (`routes/api.php`)
+- Rutas web normales (`routes/web.php`) que no son de Filament
+- Rutas de autenticación personalizadas
+- Webhooks o callbacks externos
+
+**Ejemplo de registro en `bootstrap/app.php` (Laravel 11):**
+
+```php
+->withMiddleware(function (Middleware $middleware): void {
+    $middleware->web(append: [
+        \AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy::class,
+    ]);
+    
+    $middleware->api(append: [
+        \AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy::class,
+    ]);
+})
+```
+
+### Resumen
+
+| Escenario | ¿Middleware en bootstrap/app.php? |
+|-----------|-----------------------------------|
+| Solo paneles de Filament | ❌ No necesario (los plugins lo incluyen) |
+| Paneles de Filament + API | ✅ Necesario para rutas API |
+| Paneles de Filament + rutas web | ✅ Necesario para rutas web |
+| Solo rutas fuera de Filament | ✅ Necesario |
 
 ## Flujo de Acceso
 

@@ -100,6 +100,8 @@ The plugin automatically adds these middlewares:
 1. **InitializeTenancy**: Resolves tenant from domain/subdomain
 2. **PreventTenantAccess**: Blocks access if there's an active tenant (ensures access only from central domains)
 
+**⚠️ Important**: These middlewares only apply to Filament panel routes. If you have routes outside Filament (API, normal web routes, etc.) that need tenant resolution, you must register `InitializeTenancy` in `bootstrap/app.php`. However, if you only use Filament panels, the middleware in `bootstrap/app.php` is optional.
+
 ### Access Restrictions
 
 The admin/landlord panel has the following restrictions:
@@ -209,6 +211,8 @@ The plugin automatically adds these middlewares:
 2. **EnsureTenantAccess**: Verifies that the tenant is active and not expired
 3. **PreventLandlordAccess**: Blocks access if there's no active tenant
 
+**⚠️ Important**: These middlewares only apply to Filament panel routes. If you have routes outside Filament (API, normal web routes, etc.) that need tenant resolution, you must register `InitializeTenancy` in `bootstrap/app.php`. However, if you only use Filament panels, the middleware in `bootstrap/app.php` is optional.
+
 ### Access Restrictions
 
 The tenant panel has the following restrictions:
@@ -256,6 +260,49 @@ You can change these values in `config/filament-tenancy.php`:
 ```
 
 If you have different IDs, update the configuration before using the plugins.
+
+## Middleware in bootstrap/app.php
+
+### Is It Necessary?
+
+**Short answer**: It depends on whether you have routes outside Filament.
+
+### When it's NOT necessary
+
+If you **only use Filament panels** (no API routes, normal web routes, etc.), you **DO NOT need** to register `InitializeTenancy` in `bootstrap/app.php` because the plugins already include it automatically for their routes.
+
+### When it IS necessary
+
+If you have routes outside Filament that need tenant resolution, you **DO need** to register the middleware in `bootstrap/app.php`:
+
+**Examples of routes that need global middleware:**
+- API routes (`routes/api.php`)
+- Normal web routes (`routes/web.php`) that are not Filament
+- Custom authentication routes
+- Webhooks or external callbacks
+
+**Example registration in `bootstrap/app.php` (Laravel 11):**
+
+```php
+->withMiddleware(function (Middleware $middleware): void {
+    $middleware->web(append: [
+        \AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy::class,
+    ]);
+    
+    $middleware->api(append: [
+        \AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy::class,
+    ]);
+})
+```
+
+### Summary
+
+| Scenario | Middleware in bootstrap/app.php? |
+|----------|----------------------------------|
+| Only Filament panels | ❌ Not necessary (plugins include it) |
+| Filament panels + API | ✅ Necessary for API routes |
+| Filament panels + web routes | ✅ Necessary for web routes |
+| Only routes outside Filament | ✅ Necessary |
 
 ## Access Flow
 
