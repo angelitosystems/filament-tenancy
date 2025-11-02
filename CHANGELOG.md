@@ -76,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved code maintainability and extensibility
   - Better organization of internal package structure
 
+- **Custom 404 Page for Tenant Not Found**:
+  - **Beautiful Error Page**: Custom-designed 404 page with gradient background and modern UI
+  - **Livewire Component Support**: Optional Livewire component (`TenantNotFound`) for dynamic functionality
+  - **Interactive Publishing**: Installer asks if you want to publish components and views for customization
+  - **Automatic Registration**: Custom 404 handler automatically registered in `bootstrap/app.php` (Laravel 11)
+  - **Request Details Display**: Shows domain/subdomain, resolver type, and APP_DOMAIN status for debugging
+  - **Customizable Views**: Published views can be fully customized (design, colors, content)
+  - **Fallback Support**: Works without Livewire if not available, uses internal views if not published
+  - **Package Integration**: ServiceProvider automatically loads views and publishes assets with tags
+
 ### Added
 - **Advanced Logging System**: Comprehensive logging for all tenancy operations
   - Tenant connection tracking
@@ -135,6 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic cleanup on critical errors
   - **Automatic Plan Seeding**: PlanSeeder runs automatically after migrations to create default plans
   - **Seeder Publishing**: PlanSeeder is automatically published and can be customized
+  - **Custom 404 Page Setup**: Interactive prompt to publish custom 404 page components and views
+  - **Automatic 404 Registration**: Custom 404 handler automatically registered in `bootstrap/app.php` (Laravel 11)
 
 - **Tenant Creation**:
   - Interactive command with branded interface
@@ -155,13 +167,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **TenantCore Class**: Internal abstract class containing all business logic (methods, scopes, domain/URL logic)
 
 - **Enhanced Security and Domain Validation**:
-  - **Automatic 404 for Invalid Domains**: Middleware now automatically returns 404 when a domain/subdomain doesn't match any tenant
+  - **Automatic 404 for Invalid Domains**: Middleware now automatically returns custom 404 page when a domain/subdomain doesn't match any tenant
+  - **Custom 404 Page**: Beautiful, personalized error page with request details and optional Livewire component support
+  - **404 Page Publishing**: Installer prompts to publish components and views for customization
+  - **Automatic 404 Registration**: Custom 404 handler automatically registered in `bootstrap/app.php` for Laravel 11
   - **Active Tenant Verification**: Only active tenants can be resolved (checks `is_active` and `expires_at`)
   - **Central Domain Protection**: `APP_DOMAIN` is automatically considered a central domain and will not resolve tenants
   - **Subdomain Resolution**: Enhanced subdomain resolution to check both `subdomain` field and `slug` field, with proper base domain validation
   - **Landlord Route Exception**: Landlord/admin routes can be accessed even when tenant is inactive (configurable paths)
-  - **Middleware Integration**: `InitializeTenancy` middleware now handles tenant resolution and validation automatically
-  - **Laravel 11 Middleware Registration**: Middlewares are automatically registered in `bootstrap/app.php` during installation for Laravel 11
+  - **Middleware Integration**: `InitializeTenancy` middleware now handles tenant resolution and validation automatically, using custom 404 page when available
+  - **Laravel 11 Middleware Registration**: Middlewares and exception handlers are automatically registered in `bootstrap/app.php` during installation for Laravel 11
   - **Improved Code Organization**: Clean separation between public API and internal implementation
   - **DomainResolver Integration**: Business logic now uses dedicated DomainResolver and TenantUrlGenerator classes
   - Added comprehensive fillable attributes for database connection fields

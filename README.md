@@ -19,6 +19,7 @@ A comprehensive multi-tenancy package for Filament with support for multiple dat
 - **🧹 Smart error handling** - Automatic retry and cleanup on connection errors
 - **🌐 APP_DOMAIN Auto-Detection** - Automatic domain detection from APP_URL for subdomain tenancy
 - **🔧 Enhanced Tenant Creation** - Interactive wizard with automatic domain configuration
+- **🎨 Custom 404 Page** - Beautiful personalized 404 page for tenant not found errors with Livewire component support
 
 ## Installation
 
@@ -40,6 +41,7 @@ The installer will:
 - ✅ **Create default plans automatically** (Basic, Premium, Enterprise)
 - ✅ Register the ServiceProvider automatically
 - ✅ **Register middlewares automatically** in `bootstrap/app.php` (Laravel 11) or via ServiceProvider (Laravel 10)
+- ✅ **Configure custom 404 page** - Ask if you want to publish components and views for tenant not found errors
 
 ### Manual Installation
 
@@ -54,6 +56,10 @@ php artisan vendor:publish --tag="filament-tenancy-config"
 
 # Publish the plan seeder (optional, can be customized)
 php artisan vendor:publish --tag="filament-tenancy-seeders"
+
+# Publish custom 404 page components and views (optional)
+php artisan vendor:publish --tag="filament-tenancy-views"
+php artisan vendor:publish --tag="filament-tenancy-components"
 
 # Run the migrations
 php artisan migrate
@@ -303,7 +309,7 @@ The package provides several middleware for tenant management:
 
 - **`InitializeTenancy`**: 
   - Automatically resolves tenant from domain/subdomain
-  - Returns 404 if tenant is not found
+  - Returns custom 404 page if tenant is not found (if published, otherwise standard 404)
   - Verifies tenant is active before allowing access
   - Allows access to landlord/admin routes even with inactive tenants (configurable)
   - Registered globally by default (can be disabled in config)
@@ -313,6 +319,44 @@ The package provides several middleware for tenant management:
   - Returns 404 if no tenant is found
   - Returns 403 if tenant is inactive or expired
 - `PreventAccessFromCentralDomains`: Prevents tenant access from central domains
+
+### Custom 404 Page
+
+The package includes a beautiful, personalized 404 page for tenant not found errors. During installation, you'll be asked if you want to publish the components and views for customization.
+
+#### Publishing Components
+
+```bash
+# Publish views (Blade templates)
+php artisan vendor:publish --tag="filament-tenancy-views"
+
+# Publish Livewire component (optional, requires Livewire)
+php artisan vendor:publish --tag="filament-tenancy-components"
+```
+
+#### Published Files
+
+If you choose to publish during installation:
+- **Views**: `resources/views/vendor/filament-tenancy/errors/tenant-not-found.blade.php`
+- **Livewire Component**: `app/Livewire/TenantNotFound.php` (if Livewire is available)
+
+#### Customization
+
+Once published, you can fully customize:
+- **Blade View**: Edit `resources/views/vendor/filament-tenancy/errors/tenant-not-found.blade.php` to change the design, colors, layout, or content
+- **Livewire Component**: Edit `app/Livewire/TenantNotFound.php` to add dynamic functionality or interactivity
+
+#### Automatic Registration
+
+The installer automatically registers the custom 404 page in `bootstrap/app.php` (Laravel 11) for handling tenant not found errors. The page will:
+- Display a beautiful error message
+- Show request details (domain, resolver, APP_DOMAIN)
+- Provide a link back to the homepage
+- Work without Livewire if not published
+
+#### Without Publishing
+
+If you choose not to publish, the package will use its internal views and components. The 404 page will still work, but you won't be able to customize it.
 
 ### Database Migrations
 
@@ -455,7 +499,8 @@ This package includes several security features:
 - **Domain validation**: Ensures tenants can only be accessed from their domains
 - **Database separation**: Each tenant has its own database
 - **Middleware protection**: Automatic tenant context validation
-- **Automatic 404 for invalid domains**: Domains/subdomains that don't match any tenant automatically return 404
+- **Automatic 404 for invalid domains**: Domains/subdomains that don't match any tenant automatically return a beautiful custom 404 page
+- **Customizable 404 page**: Personalized error page with request details and optional Livewire component support
 - **Active tenant verification**: Only active tenants can be accessed (checks `is_active` and `expires_at`)
 - **Central domain protection**: Central domains are protected from tenant resolution
 
