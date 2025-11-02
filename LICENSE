@@ -22,42 +22,71 @@ SOFTWARE.
 
 ---
 
-ADDITIONAL TERMS:
+ADDITIONAL TERMS AND RESTRICTIONS:
 
-In addition to the MIT license terms above, the following is established:
+In addition to the MIT license terms above, the following restrictions and terms apply:
 
-1. REPLICAS AND FORKS:
-   - You are permitted to make replicas, forks, copies, or modifications of the Software
-     without legal restrictions or consequences from the original author.
-   - No attribution or acknowledgment to the original author is required for making
-     replicas or modifications.
+1. PROHIBITED ACTIONS:
+   - ❌ You CANNOT create replicas, forks, or copies of this Software
+   - ❌ You CANNOT redistribute this Software as your own
+   - ❌ You CANNOT remove or modify license headers or copyright notices
+   - ❌ You CANNOT use this Software to create competing multi-tenancy solutions
+   - ❌ You CANNOT publish modified versions of this Software under a different name
 
-2. USE IN PROJECTS:
-   - You are permitted to use the Software in any personal, commercial, educational,
-     or any other type of project without restrictions.
-   - No additional license or payment is required to use the Software in your own projects.
+2. PERMITTED USAGE:
+   - ✅ You CAN use this Software in your projects (personal, commercial, educational)
+   - ✅ You CAN install and use the package via Composer
+   - ✅ You CAN customize configurations and extend functionality within your projects
+   - ✅ You CAN modify the Software for internal use only (not for redistribution)
 
-3. NO WARRANTIES:
-   - The Software is provided "as is", without warranties of any kind.
+3. LICENSE COMPLIANCE:
+   - You must use the Software via the official Composer repository only
+   - You must respect intellectual property rights
+   - You must contact the copyright holder for licensing inquiries: angelitosystems@gmail.com
+
+4. FUTURE LICENSING MODEL:
+   - This Software will transition to a paid license model in the future
+   - Commercial use may require a valid license in future versions
+   - Early adopters will receive preferential treatment when licensing becomes available
+   - Current public access is temporary and subject to change
+
+5. CONSEQUENCES OF NON-COMPLIANCE:
+
+   **Legal Consequences**:
+   - Violation of these terms may result in legal action for copyright infringement
+   - Distribution of unauthorized copies may result in cease and desist orders
+   - Commercial use without proper licensing (when required) will be pursued legally
+   - Creation of replicas or competing solutions will be treated as intellectual property theft
+
+   **Technical Consequences**:
+   - Package updates may include license validation mechanisms
+   - Unauthorized usage may be detected and blocked
+   - Support will not be provided to users who violate these terms
+   - Access to future versions may be restricted
+
+6. NO WARRANTIES:
+   - The Software is provided "as is", without warranties of any kind
    - The author shall not be liable for any direct, indirect, incidental, special,
      exemplary, or consequential damages resulting from the use or inability to use
-     the Software.
-
-4. PUBLIC DOMAIN EQUIVALENT:
-   - This Software may be treated as if it were in the public domain for purposes of
-     use, modification, and distribution, with the only difference being that it
-     maintains the MIT license for greater legal clarity.
+     the Software
 
 ---
 
 SUMMARY:
 
-You can do whatever you want with this code:
+**What you CAN do**:
 - ✅ Use it in your projects (personal or commercial)
-- ✅ Make replicas or copies without legal consequences
-- ✅ Modify it as you wish
-- ✅ Distribute it freely
-- ✅ You don't need to give credit to the author
+- ✅ Install via Composer
+- ✅ Customize for internal use
+- ✅ Extend functionality within your projects
 
-There are no legal restrictions for using this Software.
+**What you CANNOT do**:
+- ❌ Create replicas, forks, or copies
+- ❌ Redistribute as your own
+- ❌ Remove license headers
+- ❌ Create competing solutions
+- ❌ Publish modified versions
 
+**Important**: This package will transition to a paid license model. Non-compliance with these terms may result in legal and technical consequences.
+
+For licensing inquiries, contact: angelitosystems@gmail.com
