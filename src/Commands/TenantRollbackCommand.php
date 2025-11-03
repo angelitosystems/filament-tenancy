@@ -4,7 +4,9 @@ namespace AngelitoSystems\FilamentTenancy\Commands;
 
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
+use AngelitoSystems\FilamentTenancy\Support\DatabaseManager;
 use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
+use AngelitoSystems\FilamentTenancy\Support\TenantMigrationRunner;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -69,55 +71,62 @@ class TenantRollbackCommand extends Command
         $this->newLine();
 
         try {
+            // Get database manager
+            $databaseManager = app(DatabaseManager::class);
+            
             // Switch to tenant context
-            Tenancy::runForTenant($tenant, function () use ($tenant) {
-                // Check if migrations table exists
-                if (!Schema::hasTable('migrations')) {
-                    $this->warn('⚠️  No migrations table found. Nothing to rollback.');
-                    return;
-                }
+            $databaseManager->switchToTenant($tenant);
+            $tenantConnection = $databaseManager->getTenantConnectionName($tenant);
 
-                // Get migrations to rollback
-                $step = $this->option('step');
-                $batch = $this->option('batch');
+            // Check if migrations table exists
+            if (!Schema::connection($tenantConnection)->hasTable('migrations')) {
+                $this->warn('⚠️  No migrations table found. Nothing to rollback.');
+                return self::SUCCESS;
+            }
 
-                if ($batch) {
-                    $migrations = DB::table('migrations')
-                        ->where('batch', $batch)
-                        ->orderBy('id', 'desc')
-                        ->get();
-                } else {
-                    $lastBatch = DB::table('migrations')->max('batch');
-                    $migrations = DB::table('migrations')
-                        ->where('batch', $lastBatch)
-                        ->orderBy('id', 'desc')
-                        ->limit($step)
-                        ->get();
-                }
+            // Get migrations to rollback
+            $step = (int) $this->option('step');
+            $batch = $this->option('batch');
 
-                if ($migrations->isEmpty()) {
-                    $this->info('ℹ️  No migrations to rollback.');
-                    return;
-                }
+            if ($batch) {
+                $migrations = DB::connection($tenantConnection)
+                    ->table('migrations')
+                    ->where('batch', $batch)
+                    ->orderBy('id', 'desc')
+                    ->get();
+            } else {
+                $lastBatch = DB::connection($tenantConnection)
+                    ->table('migrations')
+                    ->max('batch');
+                $migrations = DB::connection($tenantConnection)
+                    ->table('migrations')
+                    ->where('batch', $lastBatch)
+                    ->orderBy('id', 'desc')
+                    ->limit($step)
+                    ->get();
+            }
 
-                $this->info("📦 Found {$migrations->count()} migration(s) to rollback:");
-                foreach ($migrations as $migration) {
-                    $this->line("   • {$migration->migration}");
-                }
-                $this->newLine();
+            if ($migrations->isEmpty()) {
+                $this->info('ℹ️  No migrations to rollback.');
+                return self::SUCCESS;
+            }
 
-                if (!$this->confirm('Do you want to continue with the rollback?', false)) {
-                    $this->info('❌ Rollback cancelled.');
-                    return;
-                }
+            $this->info("📦 Found {$migrations->count()} migration(s) to rollback:");
+            foreach ($migrations as $migration) {
+                $this->line("   • {$migration->migration}");
+            }
+            $this->newLine();
 
-                // Rollback each migration
-                foreach ($migrations as $migration) {
-                    $this->rollbackMigration($migration->migration);
-                }
+            if (!$this->confirm('Do you want to continue with the rollback?', false)) {
+                $this->info('❌ Rollback cancelled.');
+                return self::SUCCESS;
+            }
 
-                $this->info('✅ Rollback completed successfully!');
-            });
+            // Usar el sistema propio de rollback
+            $runner = new TenantMigrationRunner($tenant, $tenantConnection);
+            $runner->rollback($migrations->count());
+
+            $this->info('✅ Rollback completed successfully!');
 
         } catch (\Exception $e) {
             $this->error("❌ Rollback error: {$e->getMessage()}");
@@ -126,6 +135,11 @@ class TenantRollbackCommand extends Command
                 'error' => $e->getMessage(),
             ]);
             return self::FAILURE;
+        } finally {
+            // Restaurar conexión central
+            if (isset($databaseManager)) {
+                $databaseManager->switchToCentral();
+            }
         }
 
         $this->newLine();

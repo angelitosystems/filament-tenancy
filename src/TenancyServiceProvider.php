@@ -81,6 +81,10 @@ class TenancyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Set locale early from session/cookie if available
+        // This runs before Laravel uses the default locale from .env
+        $this->setLocaleEarly();
+
         // Register routes first to ensure they're available for plugins
         $this->registerRoutes();
 
@@ -163,6 +167,9 @@ class TenancyServiceProvider extends ServiceProvider
 
         // Register event listeners
         $this->registerEventListeners();
+
+        // Register locale early setup listener
+        $this->registerLocaleEarlySetup();
 
         // Register asset manager helper
         AssetManager::registerAssetHelper();
@@ -387,6 +394,97 @@ class TenancyServiceProvider extends ServiceProvider
         // Load enhanced language switching routes
         if (file_exists(__DIR__ . '/../routes/enhanced-language.php')) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/enhanced-language.php');
+        }
+    }
+
+    /**
+     * Set locale early from session/cookie before Laravel uses .env default.
+     * This ensures user's locale preference is respected even before middleware runs.
+     */
+    protected function setLocaleEarly(): void
+    {
+        // Try to set locale if request is available during boot
+        // This is a fallback, the main logic is in registerLocaleEarlySetup()
+        if (!$this->app->runningInConsole() && $this->app->bound('request')) {
+            try {
+                $request = $this->app->make('request');
+                $this->applyLocaleFromRequest($request);
+            } catch (\Exception $e) {
+                // Silently fail - listener will handle it
+            }
+        }
+    }
+
+    /**
+     * Register listener to set locale early when request is available.
+     */
+    protected function registerLocaleEarlySetup(): void
+    {
+        // Listen for route matched event to set locale early
+        // This runs before most middleware but after request is available
+        Event::listen(\Illuminate\Routing\Events\RouteMatched::class, function ($event) {
+            if (!$this->app->runningInConsole() && $event->request) {
+                $this->applyLocaleFromRequest($event->request);
+            }
+        });
+
+        // Also listen for any HTTP request if route matching hasn't fired yet
+        // This is a backup in case route matching event doesn't fire
+        if (!$this->app->runningInConsole() && $this->app->bound('request')) {
+            try {
+                $request = $this->app->make('request');
+                $this->applyLocaleFromRequest($request);
+            } catch (\Exception $e) {
+                // Silently fail - middleware will handle it
+            }
+        }
+    }
+
+    /**
+     * Apply locale from request (cookie or session).
+     */
+    protected function applyLocaleFromRequest($request): void
+    {
+        try {
+            // Check if localization is enabled
+            if (!config('filament-tenancy.localization.enabled', true)) {
+                return;
+            }
+
+            $locale = null;
+            $availableLocales = array_keys(\AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::getAvailableLocales());
+
+            // Priority 1: Check cookie (works even before session starts)
+            if ($request->hasCookie('locale')) {
+                $cookieLocale = $request->cookie('locale');
+                if (in_array($cookieLocale, $availableLocales)) {
+                    $locale = $cookieLocale;
+                }
+            }
+
+            // Priority 2: Check session if it's started
+            if (!$locale && $request->hasSession() && $request->session()->isStarted()) {
+                $sessionLocale = $request->session()->get('locale');
+                if ($sessionLocale && in_array($sessionLocale, $availableLocales)) {
+                    $locale = $sessionLocale;
+                }
+            }
+
+            // If we found a valid locale, set it early
+            if ($locale && \Illuminate\Support\Facades\App::getLocale() !== $locale) {
+                \Illuminate\Support\Facades\App::setLocale($locale);
+                \Illuminate\Support\Facades\Log::info('TenancyServiceProvider: Set locale early from session/cookie', [
+                    'locale' => $locale,
+                    'source' => $request->hasCookie('locale') ? 'cookie' : 'session',
+                    'previous_locale' => config('app.locale'),
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Silently fail if we can't set locale early
+            // The middleware will handle it later
+            \Illuminate\Support\Facades\Log::debug('TenancyServiceProvider: Could not set locale early', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

@@ -5,6 +5,8 @@ namespace AngelitoSystems\FilamentTenancy\Support;
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
 use AngelitoSystems\FilamentTenancy\Support\ConnectionManager;
 use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
+use AngelitoSystems\FilamentTenancy\Support\TenantMigrationRunner;
+use AngelitoSystems\FilamentTenancy\Support\TenantSeederRunner;
 use Illuminate\Database\DatabaseManager as IlluminateDatabaseManager;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
@@ -350,6 +352,7 @@ class DatabaseManager
 
     /**
      * Run tenant migrations from project's database/migrations/tenant/*.
+     * Usa el sistema propio de migraciones para asegurar conexión correcta.
      */
     public function runTenantMigrations(Tenant $tenant): bool
     {
@@ -357,13 +360,12 @@ class DatabaseManager
             // Switch to tenant context
             $this->switchToTenant($tenant);
             
-            // Ensure we're using the tenant connection
+            // Get tenant connection name
             $tenantConnection = $this->getTenantConnectionName($tenant);
             
-            DebugHelper::info('Starting tenant migrations', [
+            DebugHelper::info('Starting tenant migrations with custom runner', [
                 'tenant_id' => $tenant->id,
                 'tenant_connection' => $tenantConnection,
-                'current_default_connection' => config('database.default'),
             ]);
 
             // Get tenant migration path from project (not package)
@@ -377,41 +379,20 @@ class DatabaseManager
                 return true; // Not an error, just no migrations to run
             }
 
-            // Get migration files
-            $migrationFiles = glob($tenantMigrationPath . '/*.php');
-            
-            if (empty($migrationFiles)) {
-                DebugHelper::info('No tenant migration files found in project', [
-                    'tenant_id' => $tenant->id,
-                    'path' => $tenantMigrationPath,
-                ]);
-                return true;
-            }
-
-            DebugHelper::info('Running tenant migrations from project', [
-                'tenant_id' => $tenant->id,
-                'migration_count' => count($migrationFiles),
-                'path' => $tenantMigrationPath,
-            ]);
-
-            // Create migrations table if it doesn't exist
-            $this->ensureMigrationsTableExists();
-
-            // Run each migration
-            foreach ($migrationFiles as $migrationFile) {
-                $this->runMigrationFile($migrationFile);
-            }
+            // Usar el sistema propio de migraciones
+            $runner = new TenantMigrationRunner($tenant, $tenantConnection);
+            $result = $runner->run($tenantMigrationPath);
 
             DebugHelper::info('Tenant migrations completed successfully', [
                 'tenant_id' => $tenant->id,
-                'migrations_run' => count($migrationFiles),
             ]);
 
-            return true;
+            return $result;
         } catch (\Exception $e) {
             DebugHelper::error("Failed to run tenant migrations for tenant {$tenant->id}: {$e->getMessage()}", [
                 'tenant_id' => $tenant->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return false;
         } finally {
@@ -480,8 +461,25 @@ class DatabaseManager
             $originalConnection = config('database.default');
             
             try {
-                // Set the connection for the migration
+                // Force the connection to be the tenant connection
+                // This ensures Schema:: and DB:: use the correct connection
                 Config::set('database.default', $connection);
+                DB::setDefaultConnection($connection);
+                
+                // Purge any cached connections to ensure fresh connection usage
+                DB::purge($connection);
+                
+                // Verify we're using the correct connection
+                $activeConnection = DB::getDefaultConnection();
+                if ($activeConnection !== $connection) {
+                    throw new \Exception("Failed to set default connection. Expected: {$connection}, Got: {$activeConnection}");
+                }
+                
+                DebugHelper::info("Connection verified before migration execution", [
+                    'migration_class' => $migrationClass,
+                    'connection' => $connection,
+                    'active_connection' => $activeConnection,
+                ]);
                 
                 // Create a new instance of the migration
                 $migration = new $migrationClass();
@@ -491,13 +489,14 @@ class DatabaseManager
                     'connection' => $connection,
                 ]);
                 
-                // Run the migration
+                // Run the migration - Schema:: and DB:: will now use the tenant connection
                 $migration->up();
                 
                 // Record the migration in the migrations table
                 $batch = DB::connection($connection)
                     ->table('migrations')
-                    ->max('batch') + 1;
+                    ->max('batch') ?? 0;
+                $batch += 1;
                 
                 DB::connection($connection)->table('migrations')->insert([
                     'migration' => $migrationName,
@@ -514,20 +513,14 @@ class DatabaseManager
                     'migration' => $migrationName,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
+                    'connection' => $connection,
                 ]);
                 throw $e;
             } finally {
                 // Always restore the original connection
                 Config::set('database.default', $originalConnection);
+                DB::setDefaultConnection($originalConnection);
             }
-
-            // Record migration (use specific connection)
-            DB::connection($connection)->table('migrations')->insert([
-                'migration' => $migrationName,
-                'batch' => DB::connection($connection)->table('migrations')->max('batch') + 1,
-            ]);
-
-            DebugHelper::debug("Migration completed: {$migrationName}");
         }
     }
 
@@ -548,6 +541,7 @@ class DatabaseManager
 
     /**
      * Run tenant seeders from project's database/seeders/tenant/*.
+     * Usa el sistema propio de seeders para asegurar conexión correcta.
      */
     public function runTenantSeeders(Tenant $tenant): bool
     {
@@ -555,37 +549,28 @@ class DatabaseManager
             // Switch to tenant context
             $this->switchToTenant($tenant);
 
-            // Get configured seeder classes from config
-            $seederClasses = config('filament-tenancy.seeders.classes', []);
-            
-            if (empty($seederClasses)) {
-                DebugHelper::info('No tenant seeder classes configured', [
-                    'tenant_id' => $tenant->id,
-                ]);
-                return true; // Not an error, just no seeders to run
-            }
+            // Get tenant connection name
+            $tenantConnection = $this->getTenantConnectionName($tenant);
 
-            DebugHelper::info('Running tenant seeders', [
+            DebugHelper::info('Starting tenant seeders with custom runner', [
                 'tenant_id' => $tenant->id,
-                'seeder_count' => count($seederClasses),
-                'seeders' => $seederClasses,
+                'tenant_connection' => $tenantConnection,
             ]);
 
-            // Run each seeder class
-            foreach ($seederClasses as $seederClass) {
-                $this->runSeederClass($seederClass, $tenant);
-            }
+            // Usar el sistema propio de seeders
+            $runner = new TenantSeederRunner($tenant, $tenantConnection);
+            $result = $runner->run();
 
             DebugHelper::info('Tenant seeders completed successfully', [
                 'tenant_id' => $tenant->id,
-                'seeders_run' => count($seederClasses),
             ]);
 
-            return true;
+            return $result;
         } catch (\Exception $e) {
             DebugHelper::error("Failed to run tenant seeders for tenant {$tenant->id}: {$e->getMessage()}", [
                 'tenant_id' => $tenant->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return false;
         } finally {

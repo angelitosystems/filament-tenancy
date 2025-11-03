@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 
 class CreateTenantUserCommand extends Command
 {
+    protected ?Tenant $currentTenant = null;
+
     /**
      * The name and signature of the console command.
      */
@@ -61,6 +63,9 @@ class CreateTenantUserCommand extends Command
         if (!$tenant) {
             return self::FAILURE;
         }
+        
+        // Store tenant for use in other methods
+        $this->currentTenant = $tenant;
 
         // Get user data
         $userData = $this->getUserData();
@@ -70,12 +75,12 @@ class CreateTenantUserCommand extends Command
 
         // Create user in tenant context
         try {
-            $user = $this->createUserInTenant($tenant, $userData);
+            $user = $this->createUserInTenant($this->currentTenant, $userData);
             
             $this->newLine();
-            $this->info("✓ Usuario '{$user->name}' creado exitosamente en el tenant '{$tenant->name}'!");
+            $this->info("✓ Usuario '{$user->name}' creado exitosamente en el tenant '{$this->currentTenant->name}'!");
             
-            $this->displayUserInfo($user, $tenant);
+            $this->displayUserInfo($user, $this->currentTenant);
             
             return self::SUCCESS;
         } catch (\Exception $e) {

@@ -52,7 +52,11 @@ class SetLocale
         $autoDetect = config('filament-tenancy.localization.auto_detect', false);
         
         if (!$locale && $autoDetect) {
-            $locale = $this->detectBrowserLocale($request);
+            $detectedLocale = $this->detectBrowserLocale($request);
+            if ($detectedLocale) {
+                $locale = $detectedLocale;
+                Log::info('SetLocale: Using browser detected locale', ['detected_locale' => $locale]);
+            }
         }
 
         // If no locale found, use package default, then app default as last resort

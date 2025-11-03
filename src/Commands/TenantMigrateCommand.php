@@ -100,13 +100,13 @@ class TenantMigrateCommand extends Command
                     $this->newLine();
                     $this->info('🌱 Running tenant seeders...');
                     
-                    Tenancy::runForTenant($tenant, function () {
-                        $this->call('db:seed', [
-                            '--force' => $this->option('force'),
-                        ]);
-                    });
+                    $seederSuccess = $databaseManager->runTenantSeeders($tenant);
                     
-                    $this->info('✅ Tenant seeders completed!');
+                    if ($seederSuccess) {
+                        $this->info('✅ Tenant seeders completed!');
+                    } else {
+                        $this->warn('⚠️  Some seeders may have failed. Check logs for details.');
+                    }
                 }
             } else {
                 $this->error('❌ Tenant migrations failed. Check logs for details.');
