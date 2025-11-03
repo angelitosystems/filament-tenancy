@@ -17,18 +17,43 @@ class CreateTenant extends CreateRecord
             // Use the Tenancy facade to create the tenant with all the hooks
             $tenant = Tenancy::createTenant($data);
 
+            // Build success message with details
+            $details = [];
+            
+            if (config('filament-tenancy.database.auto_create', true)) {
+                $details[] = "✅ Database '{$tenant->database_name}' created";
+            }
+            
+            if (config('filament-tenancy.migrations.auto_run', true)) {
+                $details[] = "✅ Migrations executed";
+            }
+            
+            if (config('filament-tenancy.seeders.auto_run', true)) {
+                $seederCount = count(config('filament-tenancy.seeders.classes', []));
+                if ($seederCount > 0) {
+                    $details[] = "✅ {$seederCount} seeders executed";
+                }
+            }
+
+            $bodyMessage = "Tenant '{$tenant->name}' has been created successfully.";
+            if (!empty($details)) {
+                $bodyMessage .= "\n\n" . implode("\n", $details);
+            }
+
             Notification::make()
-                ->title('Tenant created successfully')
-                ->body("Tenant '{$tenant->name}' has been created with database '{$tenant->database_name}'.")
+                ->title('🎉 Tenant created successfully!')
+                ->body($bodyMessage)
                 ->success()
+                ->duration(8000) // Show longer to read details
                 ->send();
 
             return $tenant;
         } catch (\Exception $e) {
             Notification::make()
-                ->title('Failed to create tenant')
-                ->body($e->getMessage())
+                ->title('❌ Failed to create tenant')
+                ->body("Error: {$e->getMessage()}")
                 ->danger()
+                ->duration(10000)
                 ->send();
 
             throw $e;

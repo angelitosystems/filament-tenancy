@@ -4,9 +4,26 @@ namespace AngelitoSystems\FilamentTenancy\Resources;
 
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource\Pages;
+use AngelitoSystems\FilamentTenancy\Traits\HasSimpleTranslations;
 use BackedEnum;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\RestoreBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -15,116 +32,115 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TenantResource extends Resource
 {
+    use HasSimpleTranslations;
+
     protected static ?string $model = Tenant::class;
 
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-building-office';
 
-    protected static ?string $navigationLabel = 'Tenants';
-
-    protected static ?string $modelLabel = 'Tenant';
-
-    protected static ?string $pluralModelLabel = 'Tenants';
-
     protected static ?int $navigationSort = 1;
+
+    protected static ?string $recordTitleAttribute = 'name';
+
+    /**
+     * Override translation keys
+     */
+    public static function getNavigationKey(): string
+    {
+        return 'tenants';
+    }
+
+    public static function getModelKey(): string
+    {
+        return 'tenant';
+    }
+
+    public static function getPluralModelKey(): string
+    {
+        return 'tenants';
+    }
+
+    public static function getBreadcrumbKey(): string
+    {
+        return 'tenants';
+    }
+
+    public static function getNavigationGroupKey(): ?string
+    {
+        return 'user_management';
+    }
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->columns(2)
             ->components([
-                Forms\Components\Section::make('Basic Information')
+                Section::make(__('tenancy.basic_information'))
                     ->schema([
-                        Forms\Components\TextInput::make('name')
+                        TextInput::make('name')
+                            ->label(__('tenancy.name'))
                             ->required()
                             ->maxLength(255)
                             ->live(onBlur: true)
-                            ->afterStateUpdated(function (string $context, $state, Forms\Set $set) {
+                            ->afterStateUpdated(function (string $context, $state, Set $set) {
                                 if ($context === 'create') {
                                     $set('slug', \Illuminate\Support\Str::slug($state));
                                 }
                             }),
 
-                        Forms\Components\TextInput::make('slug')
+                        TextInput::make('slug')
+                            ->label(__('tenancy.slug'))
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->rules(['alpha_dash']),
 
-                        Forms\Components\Toggle::make('is_active')
-                            ->label('Active')
+                        Toggle::make('is_active')
+                            ->label(__('tenancy.is_active'))
                             ->default(true),
 
-                        Forms\Components\Select::make('plan')
+                        Select::make('plan')
+                            ->label(__('tenancy.plan'))
                             ->options([
-                                'basic' => 'Basic',
-                                'premium' => 'Premium',
-                                'enterprise' => 'Enterprise',
+                                'basic' => __('tenancy.basic'),
+                                'premium' => __('tenancy.premium'),
+                                'enterprise' => __('tenancy.enterprise'),
                             ])
-                            ->placeholder('Select a plan'),
+                            ->placeholder(__('tenancy.select_plan')),
 
-                        Forms\Components\DatePicker::make('expires_at')
-                            ->label('Expiration Date')
-                            ->placeholder('Never expires'),
+                        DatePicker::make('expires_at')
+                            ->label(__('tenancy.expires_at'))
+                            ->placeholder(__('tenancy.never_expires')),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Forms\Components\Section::make('Domain Configuration')
+                Section::make(__('tenancy.domain_configuration'))
                     ->schema([
-                        Forms\Components\TextInput::make('domain')
-                            ->label('Custom Domain')
-                            ->placeholder('example.com')
-                            ->unique(ignoreRecord: true)
-                            ->rules(['nullable', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/'])
-                            ->helperText('Full domain name (e.g., clinic.com)'),
+                        TextInput::make('domain')
+                            ->label(__('tenancy.domain'))
+                            ->placeholder(__('tenancy.example_domain'))
+                            ->helperText(__('tenancy.full_domain'))
+                            ->unique(ignoreRecord: true),
 
-                        Forms\Components\TextInput::make('subdomain')
-                            ->label('Subdomain')
-                            ->placeholder('clinic')
-                            ->unique(ignoreRecord: true)
-                            ->rules(['nullable', 'alpha_dash'])
-                            ->helperText('Subdomain prefix (e.g., clinic.yourdomain.com)'),
+                        TextInput::make('subdomain')
+                            ->label(__('tenancy.subdomain'))
+                            ->placeholder(__('tenancy.subdomain_prefix'))
+                            ->helperText(__('tenancy.subdomain_helper'))
+                            ->unique(ignoreRecord: true),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Forms\Components\Section::make('Database Configuration')
+                Section::make(__('tenancy.additional_data'))
                     ->schema([
-                        Forms\Components\TextInput::make('database_name')
-                            ->label('Database Name')
-                            ->required()
-                            ->maxLength(255)
-                            ->helperText('Will be auto-generated if left empty'),
-
-                        Forms\Components\TextInput::make('database_host')
-                            ->label('Database Host')
-                            ->placeholder('127.0.0.1')
-                            ->helperText('Leave empty to use default from template'),
-
-                        Forms\Components\TextInput::make('database_port')
-                            ->label('Database Port')
-                            ->numeric()
-                            ->placeholder('3306')
-                            ->helperText('Leave empty to use default from template'),
-
-                        Forms\Components\TextInput::make('database_username')
-                            ->label('Database Username')
-                            ->placeholder('root')
-                            ->helperText('Leave empty to use default from template'),
-
-                        Forms\Components\TextInput::make('database_password')
-                            ->label('Database Password')
-                            ->password()
-                            ->helperText('Leave empty to use default from template'),
+                        KeyValue::make('data')
+                            ->label(__('tenancy.data'))
+                            ->keyLabel(__('tenancy.name'))
+                            ->valueLabel(__('tenancy.value'))
+                            ->helperText(__('tenancy.custom_data')),
                     ])
-                    ->columns(2),
-
-                Forms\Components\Section::make('Additional Data')
-                    ->schema([
-                        Forms\Components\KeyValue::make('data')
-                            ->label('Custom Data')
-                            ->keyLabel('Key')
-                            ->valueLabel('Value')
-                            ->helperText('Store additional tenant-specific configuration'),
-                    ]),
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -137,83 +153,78 @@ class TenantResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('name')
+                    ->label(__('tenancy.name'))
                     ->searchable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('slug')
+                    ->label(__('tenancy.slug'))
                     ->searchable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('domain')
+                    ->label(__('tenancy.domain'))
                     ->searchable()
-                    ->placeholder('N/A'),
+                    ->placeholder(__('tenancy.na')),
 
                 Tables\Columns\TextColumn::make('subdomain')
+                    ->label(__('tenancy.subdomain'))
                     ->searchable()
-                    ->placeholder('N/A'),
+                    ->placeholder(__('tenancy.na')),
 
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label(__('tenancy.is_active'))
                     ->boolean()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('plan')
+                    ->label(__('tenancy.plan'))
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'basic' => 'gray',
                         'premium' => 'warning',
                         'enterprise' => 'success',
                         default => 'gray',
                     })
-                    ->placeholder('No plan'),
+                    ->placeholder(__('tenancy.no_plan')),
 
                 Tables\Columns\TextColumn::make('expires_at')
-                    ->label('Expires')
-                    ->date()
-                    ->placeholder('Never')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label(__('tenancy.expires_at'))
                     ->dateTime()
+                    ->placeholder(__('tenancy.never'))
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->label('Updated')
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Active Status'),
-
-                Tables\Filters\SelectFilter::make('plan')
+                Tables\Filters\SelectFilter::make('is_active')
+                    ->label(__('tenancy.is_active'))
                     ->options([
-                        'basic' => 'Basic',
-                        'premium' => 'Premium',
-                        'enterprise' => 'Enterprise',
+                        'true' => __('tenancy.active_status'),
+                        'false' => __('tenancy.expired'),
                     ]),
 
-                Tables\Filters\Filter::make('expired')
-                    ->query(fn (Builder $query): Builder => $query->where('expires_at', '<=', now()))
-                    ->label('Expired'),
-
-                Tables\Filters\TrashedFilter::make(),
+                Tables\Filters\SelectFilter::make('plan')
+                    ->label(__('tenancy.plan'))
+                    ->options([
+                        'basic' => __('tenancy.basic'),
+                        'premium' => __('tenancy.premium'),
+                        'enterprise' => __('tenancy.enterprise'),
+                    ]),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\RestoreAction::make(),
-                Tables\Actions\ForceDeleteAction::make(),
+                ViewAction::make(),
+                EditAction::make(),
+                DeleteAction::make(),
             ])
             ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\RestoreBulkAction::make(),
-                    Tables\Actions\ForceDeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

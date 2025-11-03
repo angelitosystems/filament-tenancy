@@ -2,10 +2,14 @@
 
 namespace AngelitoSystems\FilamentTenancy\Commands;
 
+use AngelitoSystems\FilamentTenancy\Models\Permission;
+use AngelitoSystems\FilamentTenancy\Models\Role;
+use AngelitoSystems\FilamentTenancy\Support\AssetManager;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class InstallCommand extends Command
@@ -40,6 +44,9 @@ class InstallCommand extends Command
         // Verificar y configurar base de datos
         $this->checkAndConfigureDatabase();
 
+        // Configurar variables de entorno para sesiones
+        $this->configureSessionEnvironment();
+
         // Publicar configuración
         $this->publishConfiguration();
 
@@ -57,6 +64,9 @@ class InstallCommand extends Command
 
         // Publicar componentes y vistas de 404
         $this->publish404Components();
+
+        // Preguntar si desea crear usuario admin
+        $this->askToCreateAdminUser();
 
         // Mensaje final
         $this->displaySuccessMessage();
@@ -167,6 +177,12 @@ class InstallCommand extends Command
                 '--panels' => true,
             ]);
             $this->line('  ✓ Filament configurado');
+            
+            // Configurar automáticamente el panel admin creado
+            $this->configureAdminPanel();
+            
+            // Crear y configurar el panel tenant
+            $this->createTenantPanel();
         } catch (\Exception $e) {
             $this->warn('  ⚠ No se pudo ejecutar filament:install automáticamente');
             $this->line('  Ejecuta manualmente: <fg=yellow>php artisan filament:install --panels</fg=yellow>');
@@ -321,6 +337,78 @@ class InstallCommand extends Command
     }
 
     /**
+     * Configura las variables de entorno para sesiones de tenants.
+     */
+    protected function configureSessionEnvironment(): void
+    {
+        $this->info('🔧 Configurando variables de entorno para sesiones...');
+
+        $envPath = base_path('.env');
+        if (!File::exists($envPath)) {
+            $this->error('  ✗ No se encontró el archivo .env');
+            return;
+        }
+
+        $envContent = File::get($envPath);
+        $sessionVariables = [
+            'TENANCY_SESSION_ISOLATION' => 'true',
+            'TENANCY_AUTO_CREATE_SESSION_TABLE' => 'true',
+            'TENANCY_SESSION_COOKIE_SAME_SITE' => 'lax',
+        ];
+
+        $updatedVariables = [];
+        foreach ($sessionVariables as $key => $defaultValue) {
+            // Verificar si la variable ya existe
+            if (preg_match("/^{$key}=/m", $envContent)) {
+                $currentValue = $this->getCurrentEnvValue($envContent, $key);
+                $this->line("  ℹ Variable <fg=yellow>{$key}</fg=yellow> ya existe: <fg=cyan>{$currentValue}</fg=cyan>");
+                
+                if ($this->confirm("¿Deseas actualizar {$key} al valor recomendado ({$defaultValue})?", false)) {
+                    $envContent = preg_replace("/^{$key}=.*/m", "{$key}={$defaultValue}", $envContent);
+                    $updatedVariables[] = $key;
+                    $this->line("    ✓ Actualizado a: <fg=green>{$defaultValue}</fg=green>");
+                }
+            } else {
+                // Preguntar si agregar la variable
+                if ($this->confirm("¿Deseas agregar la variable <fg=yellow>{$key}</fg=yellow> con valor <fg=green>{$defaultValue}</fg=green>? Esto previene errores 419 en tenants.", true)) {
+                    $envContent .= "\n{$key}={$defaultValue}\n";
+                    $updatedVariables[] = $key;
+                    $this->line("  ✓ Agregado: <fg=green>{$key}={$defaultValue}</fg=green>");
+                }
+            }
+        }
+
+        // Guardar cambios si hay actualizaciones
+        if (!empty($updatedVariables)) {
+            File::put($envPath, $envContent);
+            $this->call('config:clear');
+            $this->line('  ✓ Variables de entorno actualizadas');
+            $this->newLine();
+            
+            // Explicación de las variables
+            $this->info('📚 Explicación de las variables configuradas:');
+            $this->line('  • <fg=yellow>TENANCY_SESSION_ISOLATION=true</fg=yellow>: Aísla sesiones entre tenants para prevenir conflictos');
+            $this->line('  • <fg=yellow>TENANCY_AUTO_CREATE_SESSION_TABLE=true</fg=yellow>: Crea automáticamente la tabla de sesiones en bases de datos de tenants');
+            $this->line('  • <fg=yellow>TENANCY_SESSION_COOKIE_SAME_SITE=lax</fg=yellow>: Configura cookies SameSite para prevenir errores CSRF');
+            $this->newLine();
+        } else {
+            $this->line('  ℹ No se realizaron cambios en las variables de sesión');
+            $this->newLine();
+        }
+    }
+
+    /**
+     * Obtiene el valor actual de una variable de entorno.
+     */
+    protected function getCurrentEnvValue(string $envContent, string $key): string
+    {
+        if (preg_match("/^{$key}=(.*)$/m", $envContent, $matches)) {
+            return trim($matches[1]);
+        }
+        return '';
+    }
+
+    /**
      * Publica el archivo de configuración.
      */
     protected function publishConfiguration(): void
@@ -333,27 +421,63 @@ class InstallCommand extends Command
                 '--tag' => 'filament-tenancy-config',
             ]);
 
-            // Publicar también como config/tenancy.php según requerimiento
             $publishedConfig = config_path('filament-tenancy.php');
-            $targetConfig = config_path('tenancy.php');
-
             if (File::exists($publishedConfig)) {
-                if (!File::exists($targetConfig)) {
-                    File::copy($publishedConfig, $targetConfig);
-                    $this->line('  ✓ Archivo de configuración publicado como <fg=green>config/tenancy.php</fg=green>');
-                } else {
-                    // Si el archivo ya existe, preguntar si quiere sobrescribirlo
-                    if ($this->confirm('  El archivo <fg=yellow>config/tenancy.php</fg=yellow> ya existe. ¿Deseas sobrescribirlo?', false)) {
-                        File::copy($publishedConfig, $targetConfig);
-                        $this->line('  ✓ Archivo <fg=green>config/tenancy.php</fg=green> sobrescrito');
-                    } else {
-                        $this->line('  ℹ Archivo <fg=yellow>config/tenancy.php</fg=yellow> conservado sin cambios');
-                    }
-                    $this->line('  ✓ Archivo de configuración disponible en <fg=green>config/filament-tenancy.php</fg=green>');
-                }
+                $this->line('  ✓ Archivo de configuración publicado como <fg=green>config/filament-tenancy.php</fg=green>');
             }
         } catch (\Exception $e) {
             $this->error('  ✗ Error al publicar la configuración: ' . $e->getMessage());
+        }
+
+        $this->newLine();
+
+        // Publicar rutas del paquete
+        $this->publishRoutes();
+
+        // Publicar migraciones del tenant
+        $this->publishTenantMigrations();
+    }
+
+    /**
+     * Publica las migraciones del tenant.
+     */
+    protected function publishTenantMigrations(): void
+    {
+        $this->info('📦 Publicando migraciones del tenant...');
+
+        try {
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-tenant-migrations',
+            ]);
+
+            $this->line('  ✓ Migraciones del tenant publicadas en <fg=green>database/migrations/tenant/</fg=green>');
+            $this->line('  ℹ Estas migraciones se ejecutarán automáticamente cuando crees un tenant');
+        } catch (\Exception $e) {
+            $this->error('  ✗ Error al publicar las migraciones del tenant: ' . $e->getMessage());
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Publica las rutas del paquete.
+     */
+    protected function publishRoutes(): void
+    {
+        $this->info('🛣️ Publicando rutas del paquete...');
+
+        try {
+            // Publicar rutas usando vendor:publish
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-routes',
+            ]);
+
+            $this->line('  ✓ Rutas publicadas en <fg=green>routes/tenant.php</fg=green>');
+            $this->line('  ℹ Estas rutas incluyen el cambio de idioma y otras funcionalidades del paquete');
+        } catch (\Exception $e) {
+            $this->error('  ✗ Error al publicar las rutas: ' . $e->getMessage());
         }
 
         $this->newLine();
@@ -434,8 +558,8 @@ class InstallCommand extends Command
     protected function runPlanSeeder(): void
     {
         try {
-            // Publicar el seeder primero si no existe
-            $this->publishPlanSeeder();
+            // Publicar los seeders primero si no existen
+            $this->publishSeeders();
             
             // Intentar ejecutar desde Database\Seeders (si fue publicado)
             $seederClass = 'Database\\Seeders\\PlanSeeder';
@@ -465,41 +589,35 @@ class InstallCommand extends Command
     }
 
     /**
-     * Publica el seeder de planes con el namespace correcto.
+     * Publica todos los seeders con el namespace correcto.
      */
-    protected function publishPlanSeeder(): void
+    protected function publishSeeders(): void
     {
+        $this->info('🌱 Publicando seeders...');
+        
         try {
-            $sourceSeeder = __DIR__ . '/../../database/seeders/PlanSeeder.php';
-            $targetSeeder = database_path('seeders/PlanSeeder.php');
+            // Publicar seeders centrales usando vendor:publish
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-seeders',
+            ]);
             
-            // Si ya existe, no sobrescribir (permitir personalización)
-            if (File::exists($targetSeeder)) {
-                return;
-            }
+            // Publicar seeders de tenants usando vendor:publish
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-tenant-seeders',
+            ]);
             
-            // Asegurar que el directorio existe
-            if (!File::exists(database_path('seeders'))) {
-                File::makeDirectory(database_path('seeders'), 0755, true);
-            }
-            
-            if (File::exists($sourceSeeder)) {
-                $content = File::get($sourceSeeder);
-                // Cambiar el namespace al namespace de publicación
-                $content = str_replace(
-                    'namespace AngelitoSystems\\FilamentTenancy\\Database\\Seeders;',
-                    'namespace Database\\Seeders;',
-                    $content
-                );
-                File::put($targetSeeder, $content);
-            }
+            $this->line('  ✓ Seeders centrales publicados en <fg=green>database/seeders/</fg=green>');
+            $this->line('  ✓ Seeders de tenants publicados en <fg=green>database/seeders/tenant/</fg=green>');
+            $this->line('  ℹ Los seeders de tenants se ejecutarán automáticamente cuando crees un tenant');
         } catch (\Exception $e) {
-            // Silenciar errores de publicación, se intentará usar el seeder del paquete
+            $this->error('  ✗ Error al publicar los seeders: ' . $e->getMessage());
         }
     }
 
     /**
-     * Limpia la instalación en caso de error crítico.
+     * Limpia la instalación en caso de error.
      */
     protected function cleanupInstallation(): void
     {
@@ -510,7 +628,6 @@ class InstallCommand extends Command
             // Eliminar archivos de configuración publicados
             $configFiles = [
                 config_path('filament-tenancy.php'),
-                config_path('tenancy.php'),
             ];
 
             foreach ($configFiles as $configFile) {
@@ -518,6 +635,13 @@ class InstallCommand extends Command
                     File::delete($configFile);
                     $this->line("  ✓ Eliminado: {$configFile}");
                 }
+            }
+
+            // Eliminar rutas publicadas
+            $routesFile = base_path('routes/tenant.php');
+            if (File::exists($routesFile)) {
+                File::delete($routesFile);
+                $this->line("  ✓ Eliminado: {$routesFile}");
             }
 
             // Remover ServiceProvider si fue agregado automáticamente
@@ -1004,6 +1128,242 @@ class InstallCommand extends Command
     }
 
     /**
+     * Configura automáticamente el panel admin con el plugin de landlord.
+     */
+    protected function configureAdminPanel(): void
+    {
+        $panelProvidersPath = app_path('Providers/Filament');
+        $landlordPanelId = config('filament-tenancy.filament.landlord_panel_id', 'admin');
+        
+        if (!File::exists($panelProvidersPath)) {
+            return;
+        }
+        
+        // Buscar AdminPanelProvider (creado por filament:install --panels)
+        $adminProviderFile = $panelProvidersPath . '/' . Str::studly($landlordPanelId) . 'PanelProvider.php';
+        
+        // También buscar AdminPanelProvider.php por nombre común
+        if (!File::exists($adminProviderFile)) {
+            $providers = glob($panelProvidersPath . '/*PanelProvider.php');
+            foreach ($providers as $providerFile) {
+                $content = File::get($providerFile);
+                if (preg_match("/->id\(['\"]([^'\"]+)['\"]\)/", $content, $matches)) {
+                    $panelId = $matches[1];
+                    if ($panelId === $landlordPanelId || str_contains(strtolower($panelId), 'admin')) {
+                        $adminProviderFile = $providerFile;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!File::exists($adminProviderFile)) {
+            $this->line('  ℹ No se encontró AdminPanelProvider para configurar automáticamente');
+            return;
+        }
+        
+        $content = File::get($adminProviderFile);
+        
+        // Verificar si ya tiene el plugin configurado
+        if (str_contains($content, 'TenancyLandlordPlugin') || str_contains($content, 'LandlordPlugin')) {
+            $this->line('  ✓ AdminPanelProvider ya tiene TenancyLandlordPlugin configurado');
+            return;
+        }
+        
+        // Agregar el import del plugin
+        if (!str_contains($content, 'use AngelitoSystems\\FilamentTenancy\\FilamentPlugins\\TenancyLandlordPlugin;')) {
+            // Encontrar la última línea de imports
+            $lines = explode("\n", $content);
+            $lastUseIndex = 0;
+            foreach ($lines as $index => $line) {
+                if (preg_match('/^use\s+/', $line)) {
+                    $lastUseIndex = $index;
+                }
+            }
+            
+            // Insertar el import después del último use
+            array_splice($lines, $lastUseIndex + 1, 0, 'use AngelitoSystems\\FilamentTenancy\\FilamentPlugins\\TenancyLandlordPlugin;');
+            $content = implode("\n", $lines);
+        }
+        
+        // Agregar el plugin al final del método panel, antes del punto y coma final
+        // Buscar el patrón ->authMiddleware([...]) seguido de punto y coma o retorno
+        if (preg_match('/(->authMiddleware\(\[[\s\S]*?\]\));/', $content, $matches)) {
+            // Reemplazar con el authMiddleware + plugin
+            $replacement = $matches[1] . "\n            ->plugin(TenancyLandlordPlugin::make());";
+            $content = str_replace($matches[0], $replacement, $content);
+        } elseif (preg_match('/(->authMiddleware\(\[[\s\S]*?\]\))\s*;/', $content, $matches)) {
+            // Buscar con espacios antes del punto y coma
+            $replacement = $matches[1] . "\n            ->plugin(TenancyLandlordPlugin::make());";
+            $content = str_replace($matches[0], $replacement, $content);
+        } else {
+            // Fallback: buscar el final del return statement
+            if (preg_match('/(return\s+\$panel[\s\S]*?->authMiddleware\(\[[\s\S]*?\]\));/', $content, $matches)) {
+                $replacement = $matches[1] . "\n            ->plugin(TenancyLandlordPlugin::make());";
+                $content = str_replace($matches[1] . ';', $replacement, $content);
+            }
+        }
+        
+        File::put($adminProviderFile, $content);
+        $this->line("  ✓ AdminPanelProvider configurado con TenancyLandlordPlugin");
+    }
+    
+    /**
+     * Crea automáticamente el TenantPanelProvider con el plugin configurado.
+     */
+    protected function createTenantPanel(): void
+    {
+        $panelProvidersPath = app_path('Providers/Filament');
+        $tenantPanelId = config('filament-tenancy.filament.tenant_panel_id', 'tenant');
+        $tenantProviderFile = $panelProvidersPath . '/' . Str::studly($tenantPanelId) . 'PanelProvider.php';
+        
+        // Verificar si ya existe
+        if (File::exists($tenantProviderFile)) {
+            $content = File::get($tenantProviderFile);
+            if (str_contains($content, 'TenancyTenantPlugin') || str_contains($content, 'TenantPlugin')) {
+                $this->line('  ✓ TenantPanelProvider ya existe y tiene TenancyTenantPlugin configurado');
+                return;
+            }
+            // Si existe pero no tiene el plugin, lo configuraremos
+        }
+        
+        // Crear el directorio si no existe
+        if (!File::exists($panelProvidersPath)) {
+            File::makeDirectory($panelProvidersPath, 0755, true);
+        }
+        
+        $namespace = app()->getNamespace();
+        $className = Str::studly($tenantPanelId) . 'PanelProvider';
+        $fqn = $namespace . 'Providers\\Filament\\' . $className;
+        
+        // Generar el contenido del TenantPanelProvider
+        $content = <<<PHP
+<?php
+
+namespace {$namespace}Providers\Filament;
+
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Pages;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Widgets;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+class {$className} extends PanelProvider
+{
+    public function panel(Panel \$panel): Panel
+    {
+        return \$panel
+            ->id('{$tenantPanelId}')
+            ->path('admin')
+            ->login()
+            ->colors([
+                'primary' => \Filament\Support\Colors\Color::Green,
+            ])
+            ->discoverResources(in: app_path('Filament/Tenant/Resources'), for: '{$namespace}Filament\\Tenant\\Resources')
+            ->discoverPages(in: app_path('Filament/Tenant/Pages'), for: '{$namespace}Filament\\Tenant\\Pages')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->discoverWidgets(in: app_path('Filament/Tenant/Widgets'), for: '{$namespace}Filament\\Tenant\\Widgets')
+            ->widgets([
+                Widgets\AccountWidget::class,
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+            ])
+            ->plugin(TenancyTenantPlugin::make());
+    }
+}
+PHP;
+        
+        File::put($tenantProviderFile, $content);
+        
+        // Registrar el provider en bootstrap/providers.php o config/app.php
+        $this->registerPanelProvider($fqn);
+        
+        $this->line("  ✓ TenantPanelProvider creado y configurado con TenancyTenantPlugin");
+    }
+    
+    /**
+     * Registra un PanelProvider en bootstrap/providers.php o config/app.php.
+     */
+    protected function registerPanelProvider(string $fqn): void
+    {
+        // Laravel 11+ usa bootstrap/providers.php
+        $bootstrapProvidersPath = base_path('bootstrap/providers.php');
+        
+        if (File::exists($bootstrapProvidersPath)) {
+            // Laravel 11+
+            $content = File::get($bootstrapProvidersPath);
+            if (!str_contains($content, $fqn)) {
+                // Agregar al final del array, antes del cierre
+                if (preg_match('/(return\s+\[[\s\S]*?)(\s*\];)/', $content, $matches)) {
+                    $newLine = "    " . $fqn . "::class,";
+                    // Verificar si hay otros providers para agregar después del último
+                    $replacement = $matches[1];
+                    if (!str_ends_with(trim($matches[1]), ',')) {
+                        $replacement = rtrim($matches[1]) . ",";
+                    }
+                    $replacement .= "\n" . $newLine . "\n" . $matches[2];
+                    $content = str_replace($matches[0], $replacement, $content);
+                    File::put($bootstrapProvidersPath, $content);
+                } else {
+                    // Fallback: agregar al final del archivo
+                    $content = rtrim($content) . "\n" . $fqn . "::class," . "\n";
+                    File::put($bootstrapProvidersPath, $content);
+                }
+            }
+        } else {
+            // Laravel 10 usa config/app.php
+            $appConfigPath = config_path('app.php');
+            if (File::exists($appConfigPath)) {
+                $content = File::get($appConfigPath);
+                if (!str_contains($content, $fqn)) {
+                    $namespace = app()->getNamespace();
+                    $search = $namespace . 'Providers\\RouteServiceProvider::class,';
+                    $replacement = $fqn . "::class," . "\n        " . $search;
+                    if (str_contains($content, $search)) {
+                        $content = str_replace($search, $replacement, $content);
+                    } else {
+                        // Buscar el array de providers
+                        if (preg_match("/(\'providers'\s*=>\s*\[[\s\S]*?)(\s*\],)/", $content, $matches)) {
+                            $newLine = "        " . $fqn . "::class,";
+                            $replacement = $matches[1];
+                            if (!str_ends_with(trim($matches[1]), ',')) {
+                                $replacement = rtrim($matches[1]) . ",";
+                            }
+                            $replacement .= "\n" . $newLine . "\n" . $matches[2];
+                            $content = str_replace($matches[0], $replacement, $content);
+                        }
+                    }
+                    File::put($appConfigPath, $content);
+                }
+            }
+        }
+    }
+
+    /**
      * Verifica y configura los paneles de Filament.
      */
     protected function checkAndConfigureFilamentPanels(): void
@@ -1130,14 +1490,234 @@ class InstallCommand extends Command
         $this->line('╚═══════════════════════════════════════════════════════════════╝');
         $this->newLine();
         
-        $this->info('¡Filament Tenancy ha sido instalado correctamente!');
+        $this->info('🎉 ¡Filament Tenancy ha sido instalado correctamente!');
         $this->newLine();
         
-        $this->line('Próximos pasos:');
-        $this->line('  1. Revisa la configuración en <fg=cyan>config/tenancy.php</fg=cyan> o <fg=cyan>config/filament-tenancy.php</fg=cyan>');
-        $this->line('  2. Configura tus dominios centrales en la configuración');
-        $this->line('  3. Crea tu primer tenant con: <fg=yellow>php artisan tenancy:create</fg=yellow>');
+        $this->line('📋 <fg=cyan>Próximos pasos:</fg=cyan>');
+        $this->line('  1. Crea tu primer tenant: <fg=yellow>php artisan tenancy:create</fg=yellow>');
+        $this->line('  2. Accede al panel de administración central para gestionar tenants');
+        $this->line('  3. Los assets de Livewire y otros recursos se compartirán automáticamente');
+        $this->line('  4. El sistema de roles y permisos está listo para usar');
         $this->newLine();
+        
+        $this->line('📚 <fg=cyan>Comandos útiles:</fg=cyan>');
+        $this->line('  • <fg=yellow>php artisan tenancy:list</fg=yellow> - Listar todos los tenants');
+        $this->line('  • <fg=yellow>php artisan tenant:migrate</fg=yellow> - Migrar tenants');
+        $this->line('  • <fg=yellow>php artisan tenancy:delete</fg=yellow> - Eliminar un tenant');
+        $this->newLine();
+        
+        $this->line('🔐 <fg=cyan>Sistema de permisos:</fg=cyan>');
+        $this->line('  • Usa el trait <fg=yellow>HasRoles</fg=yellow> en tus modelos');
+        $this->line('  • Los roles y permisos se crearán automáticamente cuando crees tu primer tenant');
+        $this->line('  • Sistema de permisos básicos configurado para tenants');
+        $this->newLine();
+    }
+
+    /**
+     * Crea roles y permisos básicos para el sistema.
+     */
+    protected function createBasicRolesAndPermissions(): void
+    {
+        $this->info('🔐 Creando roles y permisos básicos...');
+
+        try {
+            // Crear permisos básicos
+            $permissions = [
+                ['name' => 'manage users', 'slug' => 'manage-users', 'description' => 'Gestionar usuarios'],
+                ['name' => 'manage roles', 'slug' => 'manage-roles', 'description' => 'Gestionar roles'],
+                ['name' => 'manage permissions', 'slug' => 'manage-permissions', 'description' => 'Gestionar permisos'],
+                ['name' => 'manage tenants', 'slug' => 'manage-tenants', 'description' => 'Gestionar tenants'],
+                ['name' => 'view dashboard', 'slug' => 'view-dashboard', 'description' => 'Ver dashboard'],
+                ['name' => 'manage settings', 'slug' => 'manage-settings', 'description' => 'Gestionar configuración'],
+            ];
+
+            foreach ($permissions as $permission) {
+                Permission::firstOrCreate(
+                    ['slug' => $permission['slug']],
+                    $permission
+                );
+            }
+
+            // Crear roles básicos
+            $roles = [
+                [
+                    'name' => 'Super Admin',
+                    'slug' => 'super-admin',
+                    'description' => 'Super administrador con acceso total',
+                    'permissions' => ['manage users', 'manage roles', 'manage permissions', 'manage tenants', 'view dashboard', 'manage settings']
+                ],
+                [
+                    'name' => 'Admin',
+                    'slug' => 'admin',
+                    'description' => 'Administrador con permisos limitados',
+                    'permissions' => ['manage users', 'view dashboard', 'manage settings']
+                ],
+                [
+                    'name' => 'User',
+                    'slug' => 'user',
+                    'description' => 'Usuario básico',
+                    'permissions' => ['view dashboard']
+                ],
+            ];
+
+            foreach ($roles as $roleData) {
+                $role = Role::firstOrCreate(
+                    ['slug' => $roleData['slug']],
+                    [
+                        'name' => $roleData['name'],
+                        'description' => $roleData['description'],
+                        'guard_name' => config('auth.defaults.guard', 'web'),
+                    ]
+                );
+
+                // Asignar permisos al rol
+                foreach ($roleData['permissions'] as $permissionName) {
+                    $permission = Permission::where('slug', Str::slug($permissionName))->first();
+                    if ($permission) {
+                        $role->givePermissionTo($permission);
+                    }
+                }
+            }
+
+            $this->line('  ✓ Roles y permisos creados correctamente');
+            $this->line('    • Super Admin: Todos los permisos');
+            $this->line('    • Admin: Permisos de gestión básicos');
+            $this->line('    • User: Permisos básicos');
+
+        } catch (\Exception $e) {
+            $this->warn('  ⚠ No se pudieron crear los roles y permisos: ' . $e->getMessage());
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Pregunta al usuario si desea crear un usuario administrador.
+     */
+    protected function askToCreateAdminUser(): void
+    {
+        $this->info('👤 Creación de usuario administrador');
+        $this->newLine();
+
+        if (!$this->confirm('¿Deseas crear un usuario administrador ahora?', true)) {
+            $this->line('  ℹ Puedes crear usuarios administradores más tarde usando el panel de Filament.');
+            $this->newLine();
+            return;
+        }
+
+        $this->createAdminUser();
+    }
+
+    /**
+     * Crea un usuario administrador.
+     */
+    protected function createAdminUser(): void
+    {
+        $this->newLine();
+        $this->info('📝 Configuración del usuario administrador:');
+
+        // Obtener datos del usuario
+        $name = $this->ask('Nombre del administrador', 'Super Admin');
+        $email = $this->ask('Email del administrador');
+        $password = $this->secret('Contraseña (dejar en blanco para generar automática)');
+
+        // Validar email
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->error('  ✗ Email inválido. El usuario no será creado.');
+            return;
+        }
+
+        // Generar contraseña si no se proporciona
+        if (empty($password)) {
+            $password = Str::random(12);
+            $this->line("  ℹ Contraseña generada automáticamente: <fg=yellow>{$password}</fg=yellow>");
+        }
+
+        try {
+            // Crear modelo User dinámicamente
+            $userModel = config('auth.providers.users.model', 'App\\Models\\User');
+            
+            if (!class_exists($userModel)) {
+                // Crear modelo User básico si no existe
+                $this->createBasicUserModel();
+                $userModel = 'App\\Models\\User';
+            }
+
+            // Crear usuario
+            $user = $userModel::create([
+                'name' => $name,
+                'email' => $email,
+                'password' => Hash::make($password),
+                'email_verified_at' => now(),
+            ]);
+
+            // Asignar rol de Super Admin
+            if (method_exists($user, 'assignRole')) {
+                $superAdminRole = Role::where('slug', 'super-admin')->first();
+                if ($superAdminRole) {
+                    $user->assignRole($superAdminRole);
+                    $this->line('  ✓ Rol Super Admin asignado correctamente');
+                }
+            }
+
+            $this->newLine();
+            $this->line('╔═══════════════════════════════════════════════════════════════╗');
+            $this->line('║                    <fg=green>Usuario Creado</fg=green>                      ║');
+            $this->line('╚═══════════════════════════════════════════════════════════════╝');
+            $this->line("  Nombre: <fg=cyan>{$name}</fg=cyan>");
+            $this->line("  Email: <fg=cyan>{$email}</fg=cyan>");
+            $this->line("  Contraseña: <fg=yellow>{$password}</fg=yellow>");
+            $this->line("  Rol: <fg=cyan>Super Admin</fg=cyan>");
+            $this->newLine();
+            $this->warn('  ⚠ Guarda estas credenciales en un lugar seguro.');
+            $this->newLine();
+
+        } catch (\Exception $e) {
+            $this->error('  ✗ Error al crear el usuario: ' . $e->getMessage());
+            $this->line('  ℹ Puedes crear el usuario manualmente más tarde.');
+        }
+    }
+
+    /**
+     * Crea un modelo User básico si no existe.
+     */
+    protected function createBasicUserModel(): void
+    {
+        $userModelPath = app_path('Models/User.php');
+        
+        if (!File::exists($userModelPath)) {
+            $userModelContent = '<?php
+
+            namespace App\Models;
+
+            use AngelitoSystems\FilamentTenancy\Concerns\HasRoles;
+            use Illuminate\Database\Eloquent\Factories\HasFactory;
+            use Illuminate\Foundation\Auth\User as Authenticatable;
+            use Illuminate\Notifications\Notifiable;
+
+            class User extends Authenticatable
+            {
+                use HasFactory, Notifiable, HasRoles;
+
+                protected $fillable = [
+                    \'name\',
+                    \'email\',
+                    \'password\',
+                ];
+
+                protected $hidden = [
+                    \'password\',
+                    \'remember_token\',
+                ];
+
+                protected $casts = [
+                    \'email_verified_at\' => \'datetime\',
+                ];
+            }';
+
+            File::put($userModelPath, $userModelContent);
+            $this->line('  ✓ Modelo User creado en app/Models/User.php');
+        }
     }
 }
 

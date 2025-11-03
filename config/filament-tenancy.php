@@ -34,8 +34,6 @@ return [
     'central_domains' => [
         'localhost',
         '127.0.0.1',
-        // APP_DOMAIN is automatically considered a central domain
-        // You can add additional central domains here if needed
     ],
 
     /*
@@ -193,10 +191,10 @@ return [
         |
         */
         'listeners' => [
-            // 'AngelitoSystems\FilamentTenancy\Events\TenantCreated' => [
-            //     'AngelitoSystems\FilamentTenancy\Listeners\CreateTenantDatabase',
-            //     'AngelitoSystems\FilamentTenancy\Listeners\RunTenantMigrations',
-            // ],
+            'AngelitoSystems\FilamentTenancy\Events\TenantCreated' => [
+                'AngelitoSystems\FilamentTenancy\Listeners\ShareAssetsOnTenantCreated',
+                'AngelitoSystems\FilamentTenancy\Listeners\CreateRolesAndPermissionsOnTenantCreated',
+            ],
         ],
     ],
 
@@ -463,6 +461,52 @@ return [
         */
         'paths' => [
             database_path('migrations/tenant'),
+            __DIR__ . '/../database/migrations/tenant',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Seeder Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for tenant seeders.
+    |
+    */
+    'seeders' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Run Seeders
+        |--------------------------------------------------------------------------
+        |
+        | Whether to automatically run seeders when creating a tenant.
+        |
+        */
+        'auto_run' => env('TENANCY_AUTO_SEED', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Seeder Classes
+        |--------------------------------------------------------------------------
+        |
+        | Seeder classes to run for tenant databases.
+        |
+        */
+        'classes' => [
+            'Database\\Seeders\\Tenant\\RolePermissionSeeder',
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Seeder Paths
+        |--------------------------------------------------------------------------
+        |
+        | Additional paths to search for tenant seeders.
+        |
+        */
+        'paths' => [
+            database_path('seeders/tenant'),
+            __DIR__ . '/../database/seeders/tenant',
         ],
     ],
 
@@ -484,6 +528,70 @@ return [
             'require_lowercase' => env('TENANCY_PASSWORD_REQUIRE_LOWERCASE', true),
             'require_numbers' => env('TENANCY_PASSWORD_REQUIRE_NUMBERS', true),
             'require_symbols' => env('TENANCY_PASSWORD_REQUIRE_SYMBOLS', false),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Session Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for tenant session management to prevent 419 errors.
+    |
+    */
+    'session' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Session Isolation
+        |--------------------------------------------------------------------------
+        |
+        | Whether to isolate sessions between tenants to prevent conflicts.
+        |
+        */
+        'isolation' => env('TENANCY_SESSION_ISOLATION', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cross Subdomain Sessions
+        |--------------------------------------------------------------------------
+        |
+        | Allow sessions to work across subdomains for the same tenant.
+        |
+        */
+        'cross_subdomain' => env('TENANCY_CROSS_SUBDOMAIN_SESSIONS', false),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Session Prefix
+        |--------------------------------------------------------------------------
+        |
+        | Prefix to use for tenant sessions when using Redis or other drivers.
+        |
+        */
+        'prefix' => env('TENANCY_SESSION_PREFIX', 'tenant'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Create Session Table
+        |--------------------------------------------------------------------------
+        |
+        | Whether to automatically create the sessions table in tenant databases.
+        |
+        */
+        'auto_create_session_table' => env('TENANCY_AUTO_CREATE_SESSION_TABLE', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Session Cookie Configuration
+        |--------------------------------------------------------------------------
+        |
+        | Tenant-specific cookie configuration to prevent 419 errors.
+        |
+        */
+        'cookie' => [
+            'domain' => env('TENANCY_SESSION_COOKIE_DOMAIN', null),
+            'secure' => env('TENANCY_SESSION_COOKIE_SECURE', null),
+            'same_site' => env('TENANCY_SESSION_COOKIE_SAME_SITE', 'lax'),
         ],
     ],
 
@@ -514,5 +622,126 @@ return [
             'min_size' => env('TENANCY_CONNECTION_POOL_MIN_SIZE', 5),
             'idle_timeout' => env('TENANCY_CONNECTION_IDLE_TIMEOUT', 300),
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assets Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for sharing assets between central and tenants.
+    |
+    */
+    'assets' => [
+        'central_disk' => env('TENANCY_CENTRAL_DISK', 'public'),
+        'tenant_disk' => env('TENANCY_TENANT_DISK', 'public'),
+        'shared_directories' => [
+            'livewire',
+            'filament',
+            'css',
+            'js',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Localization Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for multilingual support in the tenancy package.
+    |
+    */
+    'localization' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Enable Localization
+        |--------------------------------------------------------------------------
+        |
+        | Whether to enable multilingual support for the package.
+        |
+        */
+        'enabled' => env('TENANCY_LOCALIZATION_ENABLED', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Supported Locales
+        |--------------------------------------------------------------------------
+        |
+        | List of supported locales for the package.
+        |
+        */
+        'supported_locales' => [
+            'en' => 'English',
+            'es' => 'Español',
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Default Locale
+        |--------------------------------------------------------------------------
+        |
+        | Default locale to use when no locale is specified.
+        | This is independent from APP_LOCALE and allows the package to have
+        | its own default while respecting user manual selections.
+        |
+        */
+        'default_locale' => env('TENANCY_DEFAULT_LOCALE', 'en'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Detect Locale
+        |--------------------------------------------------------------------------
+        |
+        | Whether to automatically detect locale from browser Accept-Language header.
+        | Set to false for manual language switching only.
+        |
+        */
+        'auto_detect' => env('TENANCY_AUTO_DETECT_LOCALE', false),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Store User Preference
+        |--------------------------------------------------------------------------
+        |
+        | Whether to store user locale preference in the database.
+        |
+        */
+        'store_user_preference' => env('TENANCY_STORE_USER_LOCALE', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Show Language Switcher
+        |--------------------------------------------------------------------------
+        |
+        | Whether to show the language switcher in Filament panels.
+        |
+        */
+        'show_language_switcher' => env('TENANCY_SHOW_LANGUAGE_SWITCHER', true),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Language Switcher Position
+        |--------------------------------------------------------------------------
+        |
+        | Position of the language switcher in the Filament panel.
+        | Currently implemented using user menu items for all positions.
+        | Future versions may support header/sidebar actions.
+        | Options: 'header', 'sidebar', 'user_menu'
+        |
+        */
+        'language_switcher_position' => env('TENANCY_LANGUAGE_SWITCHER_POSITION', 'user_menu'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Roles & Permissions
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the roles and permissions system.
+    |
+    */
+    'permissions' => [
+        'register_middleware' => env('TENANCY_PERMISSIONS_MIDDLEWARE', true),
+        'auto_seed' => env('TENANCY_PERMISSIONS_AUTO_SEED', true),
     ],
 ];

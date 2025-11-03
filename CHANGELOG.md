@@ -8,6 +8,175 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Seeder Management**:
+  - Moved tenant seeders to `database/seeders/tenant/` subfolder for better organization
+  - Updated installer to automatically publish all seeders during installation
+  - Added separate publishing tags for central and tenant seeders
+  - Updated tenant creation listener to use tenant-specific seeders
+  - Added seeder configuration options in `config/filament-tenancy.php`
+
+- **Central Database Management System**:
+  - Central roles and permissions tables for landlord/central administration
+  - `CentralRolePermissionSeeder` with 10 central permissions and 3 roles
+  - Central roles: Super Admin, Landlord Admin, Support
+  - Separate permission system for central vs tenant management
+  - Complete isolation between central and tenant permission systems
+
+- **Central Database Setup Commands**:
+  - `filament-tenancy:setup-central` - Complete central database setup with optional admin creation
+  - `filament-tenancy:seed-central` - Seed central database with roles and permissions
+  - `filament-tenancy:create-central-admin` - Create central admin user with Super Admin role
+  - Interactive admin creation with validation and error handling
+  - Support for both interactive and parameter-based admin creation
+
+- **Central Database Migrations**:
+  - 5 new migration files for central role/permission system
+  - `create_central_roles_table`, `create_central_permissions_table`
+  - `create_central_model_has_permissions_table`, `create_central_role_has_permissions_table`
+  - `create_central_model_has_roles_table`
+  - Automatic foreign key constraints and proper indexing
+
+- **Enhanced Permission Architecture**:
+  - Dual permission system (central + tenant-specific)
+  - Central permissions for: manage tenants, plans, subscriptions, system settings
+  - Tenant permissions for: users, roles, permissions, posts, settings
+  - Proper role assignment and permission inheritance
+  - Database-level isolation between central and tenant permissions
+
+- **Tenant User Management Command** (`tenant:user-create`):
+  - Interactive command for creating users in specific tenants
+  - Role and permission assignment during user creation
+  - Support for both interactive and non-interactive modes
+  - Automatic password generation with secure random strings
+  - Tenant, role, and permission listing capabilities
+  - Comprehensive user information display with access URLs
+
+- **Enhanced Debug Logging System**:
+  - `DebugHelper` class for environment-aware logging
+  - Logs only shown when `APP_ENV=local` AND `APP_DEBUG=true`
+  - Production-safe logging (errors/criticals always visible)
+  - Conditional debug, info, and warning messages
+  - Optimized log output for production environments
+
+- **Fixed Permissions Table Migration Issue**:
+  - Resolved `Table 'permissions' doesn't exist` error during installation
+  - Moved role/permission creation from installer to tenant creation event
+  - `CreateRolesAndPermissionsOnTenantCreated` event listener
+  - Proper tenant database context for permission seeding
+  - Updated installer success messages to reflect new behavior
+
+- **Automatic Tenant Migrations**:
+  - `RunTenantMigrationsOnTenantCreated` event listener
+  - Automatic execution of migrations from `database/migrations/tenant/*`
+  - Tenant migration publishing during package installation
+  - Migration tracking with tenant-specific migrations table
+  - Support for project-specific tenant migrations
+
+- **Enhanced Installer with Tenant Migration Publishing**:
+  - Automatic publishing of tenant migrations during installation
+  - `filament-tenancy-tenant-migrations` tag for selective publishing
+  - Clear messaging about tenant migration functionality
+  - Example tenant migrations included in package
+
+- **Tenant Migration Management Commands**:
+  - `tenant:migrate` - Run migrations for specific tenant with interactive selection
+  - `tenant:rollback` - Rollback migrations with batch and step control
+  - `tenant:fresh` - Complete database reset with safety warnings
+  - Support for seeders, force mode, and advanced options
+  - Comprehensive error handling and validation
+
+### Fixed
+- **Central Database Table Missing Error**:
+  - Fixed `Base table or view not found: 1146 Table 'test.roles' doesn't exist` error
+  - Created central database migrations for roles and permissions tables
+  - Added central seeder for proper role/permission initialization
+  - Resolved tenant creation failures due to missing central tables
+
+- **Tenancy Logger Channel Configuration**:
+  - Fixed `Log [tenancy] is not defined` InvalidArgumentException
+  - Added fallback to default log channel when tenancy channel is not configured
+  - Improved error handling in TenancyLogger class
+  - Enhanced logging reliability across different environments
+
+- **PlanResource NavigationGroup Type Error**:
+  - Fixed `Type of PlanResource::$navigationGroup must be UnitEnum|string|null` fatal error
+  - Corrected type declaration from `string|\UnitEnum|null` to `?string`
+  - Resolved Filament Resource compatibility issues
+
+- **Connection Manager Interface Resolution**:
+  - Fixed Laravel container not recognizing `ConnectionManager` as implementing `ConnectionManagerInterface`
+  - Updated `DatabaseManager` to use concrete `ConnectionManager` class
+  - Resolved tenant creation command failures
+  - Improved dependency injection reliability
+
+- **Interactive Command Selection Issues**:
+  - Fixed numeric selection in `tenant:user-create` command
+  - Corrected choice method indexing for tenant, role, and permission selection
+  - Enhanced user experience with proper option numbering
+
+- **Log Optimization**:
+  - Removed unnecessary production logs
+  - Conditional debug logging based on environment
+  - Optimized performance by reducing log overhead
+  - Maintained critical error logging in all environments
+
+### Improved
+- **Production Performance**:
+  - Reduced log output in production environments
+  - Enhanced debug helper for environment-aware logging
+  - Optimized tenant creation performance
+  - Better error handling and user feedback
+
+- **Developer Experience**:
+  - Enhanced command-line interfaces with better error messages
+  - Improved interactive prompts with validation
+  - Comprehensive help text and usage examples
+  - Better documentation for all commands
+
+### Previous Features
+- **Complete Roles and Permissions System** (Spatie-like):
+  - `Role` and `Permission` models with Core architecture
+  - `HasRoles` trait for models with role/permission functionality
+  - Database migrations for roles, permissions, and pivot tables
+  - `PermissionManager` service for centralized permission management
+  - `CheckPermission` and `CheckRole` middleware for route protection
+  - Basic role seeding (Super Admin, Admin, User) with default permissions
+  - Tenant-isolated permission system
+  - Full API for role/permission assignment and checking
+
+- **Asset Sharing System**:
+  - `AssetManager` class for sharing central assets with tenants
+  - Automatic asset copying on tenant creation
+  - `tenant_asset()` helper function with fallback to central assets
+  - Configurable shared directories (Livewire, Filament, CSS, JS)
+  - Support for symbolic links as alternative to copying
+  - Storage disk abstraction for flexible asset management
+  - Event listener for automatic asset sharing on tenant creation
+
+- **Enhanced Installer with Admin User Creation**:
+  - Interactive admin user creation during installation
+  - Automatic User model creation if not exists
+  - Super Admin role assignment for created admin user
+  - Password generation with secure random strings
+  - Email validation and credential display
+  - Integration with roles and permissions system
+
+- **Tenant Users Table Migration**:
+  - Standard users table migration for tenant databases
+  - Compatible with HasRoles trait
+  - Basic Laravel user structure (name, email, password, email_verified_at)
+
+### Improved
+- **Static Analysis Compatibility**: All middleware and utility classes now use `call_user_func` to avoid IDE static analysis errors
+- **Error Handling**: Enhanced error handling for missing methods and storage capabilities
+- **Documentation**: Complete documentation for new features and systems
+
+### Fixed
+- IDE static analysis errors in middleware classes
+- Storage URL generation issues in AssetManager
+- User model reference problems in installer
+
+### Previous Features
 - **Interactive Installer Command** (`filament-tenancy:install`):
   - Automatic Filament installation check and setup
   - Database compatibility verification (MySQL/PostgreSQL)

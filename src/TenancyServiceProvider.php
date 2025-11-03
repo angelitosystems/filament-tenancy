@@ -2,20 +2,42 @@
 
 namespace AngelitoSystems\FilamentTenancy;
 
+use AngelitoSystems\FilamentTenancy\Commands\TestLanguageSwitchingCommand;
+use AngelitoSystems\FilamentTenancy\Commands\ClearLanguageSessionCommand;
+use AngelitoSystems\FilamentTenancy\Commands\DebugConfigCommand;
+use AngelitoSystems\FilamentTenancy\Commands\TestManualSwitchCommand;
+use AngelitoSystems\FilamentTenancy\Commands\CreateCentralAdminCommand;
 use AngelitoSystems\FilamentTenancy\Commands\CreateTenantCommand;
+use AngelitoSystems\FilamentTenancy\Commands\CreateTenantUserCommand;
+use AngelitoSystems\FilamentTenancy\Commands\DebugLanguageRoutesCommand;
 use AngelitoSystems\FilamentTenancy\Commands\DeleteTenantCommand;
+use AngelitoSystems\FilamentTenancy\Commands\DiagnoseLanguageCommand;
 use AngelitoSystems\FilamentTenancy\Commands\InstallCommand;
 use AngelitoSystems\FilamentTenancy\Commands\ListTenantsCommand;
 use AngelitoSystems\FilamentTenancy\Commands\MigrateTenantCommand;
 use AngelitoSystems\FilamentTenancy\Commands\MonitorConnectionsCommand;
+use AngelitoSystems\FilamentTenancy\Commands\PublishAssetsCommand;
+use AngelitoSystems\FilamentTenancy\Commands\TestTranslationsCommand;
+use AngelitoSystems\FilamentTenancy\Commands\SeedCentralDatabaseCommand;
+use AngelitoSystems\FilamentTenancy\Commands\SetupCentralDatabaseCommand;
+use AngelitoSystems\FilamentTenancy\Commands\TenantFreshCommand;
+use AngelitoSystems\FilamentTenancy\Commands\TenantMigrateCommand;
+use AngelitoSystems\FilamentTenancy\Commands\TenantRollbackCommand;
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
+use AngelitoSystems\FilamentTenancy\Facades\TenancyPermissions;
 use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyLandlordPlugin;
 use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
+use AngelitoSystems\FilamentTenancy\Middleware\CheckPermission;
+use AngelitoSystems\FilamentTenancy\Middleware\CheckRole;
 use AngelitoSystems\FilamentTenancy\Middleware\EnsureTenantAccess;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventAccessFromCentralDomains;
+use AngelitoSystems\FilamentTenancy\Middleware\SetLocale;
 use AngelitoSystems\FilamentTenancy\Middleware\TenancyPerformanceMonitor;
+use AngelitoSystems\FilamentTenancy\Middleware\TenantSessionMiddleware;
+use AngelitoSystems\FilamentTenancy\Support\AssetManager;
 use AngelitoSystems\FilamentTenancy\Support\DatabaseManager;
+use AngelitoSystems\FilamentTenancy\Support\PermissionManager;
 use AngelitoSystems\FilamentTenancy\Support\TenantManager;
 use AngelitoSystems\FilamentTenancy\Support\TenantResolver;
 use AngelitoSystems\FilamentTenancy\Support\ConnectionManager;
@@ -28,6 +50,7 @@ use AngelitoSystems\FilamentTenancy\Support\Contracts\CredentialManagerInterface
 use Filament\Panel;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class TenancyServiceProvider extends ServiceProvider
@@ -58,6 +81,9 @@ class TenancyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register routes first to ensure they're available for plugins
+        $this->registerRoutes();
+
         // Publish configuration
         $this->publishes([
             __DIR__ . '/../config/filament-tenancy.php' => config_path('filament-tenancy.php'),
@@ -68,18 +94,55 @@ class TenancyServiceProvider extends ServiceProvider
             __DIR__ . '/../database/migrations' => database_path('migrations'),
         ], 'filament-tenancy-migrations');
 
-        // Publish seeders (will copy PlanSeeder to Database\Seeders namespace)
+        // Publish tenant migrations (example migrations for tenant databases)
+        $this->publishes([
+            __DIR__ . '/../database/migrations/tenant' => database_path('migrations/tenant'),
+        ], 'filament-tenancy-tenant-migrations');
+
+        // Publish seeders (will copy seeders to Database\Seeders namespace)
         $this->publishes([
             __DIR__ . '/../database/seeders/PlanSeeder.php' => database_path('seeders/PlanSeeder.php'),
+            __DIR__ . '/../database/seeders/CentralRolePermissionSeeder.php' => database_path('seeders/CentralRolePermissionSeeder.php'),
         ], 'filament-tenancy-seeders');
+
+        // Publish tenant seeders (for tenant databases)
+        $this->publishes([
+            __DIR__ . '/../database/seeders/tenant' => database_path('seeders/tenant'),
+        ], 'filament-tenancy-tenant-seeders');
 
         // Load views
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'filament-tenancy');
+
+        // Load language files
+        $this->loadTranslationsFrom(__DIR__ . '/../lang', 'filament-tenancy');
 
         // Publish views (404 page)
         $this->publishes([
             __DIR__ . '/../resources/views' => resource_path('views/vendor/filament-tenancy'),
         ], 'filament-tenancy-views');
+
+        // Publish language files
+        $this->publishes([
+            __DIR__ . '/../lang' => resource_path('lang/vendor/filament-tenancy'),
+        ], 'filament-tenancy-lang');
+
+        // Publish simple language files for __('tenancy.key') usage
+        $this->publishes([
+            __DIR__ . '/../lang/es/simple.php' => resource_path('lang/es/tenancy.php'),
+            __DIR__ . '/../lang/en/simple.php' => resource_path('lang/en/tenancy.php'),
+        ], 'filament-tenancy-simple-lang');
+
+        // Publish Filament translations
+        $this->publishes([
+            __DIR__ . '/../lang/es/filament-actions.php' => resource_path('lang/es/filament-actions.php'),
+            __DIR__ . '/../lang/es/filament-panels.php' => resource_path('lang/es/filament-panels.php'),
+            __DIR__ . '/../lang/es/filament-tables.php' => resource_path('lang/es/filament-tables.php'),
+        ], 'filament-tenancy-filament-lang');
+
+        // Publish routes
+        $this->publishes([
+            __DIR__ . '/../routes/tenant.php' => base_path('routes/tenant.php'),
+        ], 'filament-tenancy-routes');
 
         // Publish Livewire component
         $this->publishes([
@@ -89,6 +152,9 @@ class TenancyServiceProvider extends ServiceProvider
         // Load migrations
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
+        // Register events
+        $this->registerEvents();
+
         // Register middleware
         $this->registerMiddleware();
 
@@ -97,6 +163,9 @@ class TenancyServiceProvider extends ServiceProvider
 
         // Register event listeners
         $this->registerEventListeners();
+
+        // Register asset manager helper
+        AssetManager::registerAssetHelper();
     }
 
     /**
@@ -159,6 +228,11 @@ class TenancyServiceProvider extends ServiceProvider
             );
         });
 
+        // Register PermissionManager
+        $this->app->singleton(PermissionManager::class, function ($app) {
+            return new PermissionManager();
+        });
+
         // Register current tenant instance
         $this->app->instance('current-tenant', null);
     }
@@ -171,6 +245,7 @@ class TenancyServiceProvider extends ServiceProvider
         $this->app->alias(TenantResolver::class, 'tenancy.resolver');
         $this->app->alias(DatabaseManager::class, 'tenancy.database');
         $this->app->alias(TenantManager::class, 'tenancy');
+        $this->app->alias(PermissionManager::class, 'tenancy.permissions');
     }
 
     /**
@@ -181,8 +256,23 @@ class TenancyServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 InstallCommand::class,
+                PublishAssetsCommand::class,
+                TestTranslationsCommand::class,
+                DiagnoseLanguageCommand::class,
+                DebugLanguageRoutesCommand::class,
+                TestLanguageSwitchingCommand::class,
+                ClearLanguageSessionCommand::class,
+                DebugConfigCommand::class,
+                TestManualSwitchCommand::class,
+                SetupCentralDatabaseCommand::class,
+                CreateCentralAdminCommand::class,
+                SeedCentralDatabaseCommand::class,
                 CreateTenantCommand::class,
+                CreateTenantUserCommand::class,
                 MigrateTenantCommand::class,
+                TenantMigrateCommand::class,
+                TenantRollbackCommand::class,
+                TenantFreshCommand::class,
                 ListTenantsCommand::class,
                 DeleteTenantCommand::class,
                 MonitorConnectionsCommand::class,
@@ -201,10 +291,16 @@ class TenancyServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenancy.prevent-central-access', PreventAccessFromCentralDomains::class);
         $router->aliasMiddleware('tenancy.ensure-tenant-access', EnsureTenantAccess::class);
         $router->aliasMiddleware('tenancy.performance-monitor', TenancyPerformanceMonitor::class);
+        $router->aliasMiddleware('tenancy.session', TenantSessionMiddleware::class);
+        $router->aliasMiddleware('permission', CheckPermission::class);
+        $router->aliasMiddleware('role', CheckRole::class);
+        $router->aliasMiddleware('locale', SetLocale::class);
 
         // Add global middleware if configured
         if (config('filament-tenancy.middleware.global', true)) {
             $router->pushMiddlewareToGroup('web', InitializeTenancy::class);
+            // Add session middleware after initialization to prevent 419 errors
+            $router->pushMiddlewareToGroup('web', TenantSessionMiddleware::class);
         }
     }
 
@@ -230,6 +326,23 @@ class TenancyServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register events.
+     */
+    protected function registerEvents(): void
+    {
+        // Register tenant creation events
+        $this->app['events']->listen(
+            \AngelitoSystems\FilamentTenancy\Events\TenantCreated::class,
+            \AngelitoSystems\FilamentTenancy\Listeners\CreateRolesAndPermissionsOnTenantCreated::class
+        );
+
+        $this->app['events']->listen(
+            \AngelitoSystems\FilamentTenancy\Events\TenantCreated::class,
+            \AngelitoSystems\FilamentTenancy\Listeners\RunTenantMigrationsOnTenantCreated::class
+        );
+    }
+
+    /**
      * Register event listeners.
      */
     protected function registerEventListeners(): void
@@ -245,6 +358,39 @@ class TenancyServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register package routes.
+     */
+    protected function registerRoutes(): void
+    {
+        // Register routes immediately with the router
+        Route::middleware('web')
+            ->prefix('language')
+            ->group(function () {
+                Route::get('{locale}', function (string $locale) {
+                    if (in_array($locale, array_keys(\AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::getAvailableLocales()))) {
+                        \AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::setLocale($locale);
+                    }
+                    return redirect()->back();
+                })->name('language.switch');
+            });
+
+        // Also load from file if it exists
+        if (file_exists(__DIR__ . '/../routes/tenant.php')) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/tenant.php');
+        }
+        
+        // Load additional web routes for Laravel 12 compatibility
+        if (file_exists(__DIR__ . '/../routes/web.php')) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        }
+        
+        // Load enhanced language switching routes
+        if (file_exists(__DIR__ . '/../routes/enhanced-language.php')) {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/enhanced-language.php');
+        }
+    }
+
+    /**
      * Get the services provided by the provider.
      */
     public function provides(): array
@@ -253,7 +399,9 @@ class TenancyServiceProvider extends ServiceProvider
             TenantResolver::class,
             DatabaseManager::class,
             TenantManager::class,
+            PermissionManager::class,
             'tenancy',
+            'tenancy.permissions',
         ];
     }
 }

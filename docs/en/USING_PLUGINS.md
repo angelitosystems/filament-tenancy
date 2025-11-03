@@ -19,6 +19,246 @@ Before using the plugins, make sure you have:
 2. ✅ Run `php artisan filament-tenancy:install`
 3. ✅ Have at least one Filament panel created
 
+## Quick Implementation Guide
+
+This guide will show you step by step how to configure both panels (Admin and Tenant) with Filament Tenancy plugins.
+
+### Step 1: Create the Admin Panel (Landlord)
+
+Create or modify the file `app/Providers/Filament/AdminPanelProvider.php`:
+
+```php
+<?php
+
+namespace App\Providers\Filament;
+
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyLandlordPlugin;
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Pages;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Widgets;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+class AdminPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->id('admin')  // 👈 Panel ID (must match landlord_panel_id in config)
+            ->path('admin')  // 👈 Panel path (e.g., https://app.example.com/admin)
+            ->login()
+            ->colors([
+                'primary' => \Filament\Support\Colors\Color::Blue,
+            ])
+            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->widgets([
+                Widgets\AccountWidget::class,
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+            ])
+            ->plugin(TenancyLandlordPlugin::make()); // 👈 Landlord plugin (IMPORTANT)
+    }
+}
+```
+
+**Key Points:**
+- The `id('admin')` must match `landlord_panel_id` in `config/filament-tenancy.php` (default is `admin`)
+- The plugin `TenancyLandlordPlugin::make()` is added at the end with `->plugin()`
+- This panel will only be accessible from central domains (e.g., `app.example.com/admin`)
+
+### Step 2: Create the Tenant Panel
+
+Create the file `app/Providers/Filament/TenantPanelProvider.php`:
+
+```php
+<?php
+
+namespace App\Providers\Filament;
+
+use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Pages;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Widgets;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\AuthenticateSession;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+class TenantPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->id('tenant')  // 👈 Panel ID (must match tenant_panel_id in config)
+            ->path('admin')  // 👈 Panel path (e.g., https://tenant1.example.com/admin)
+            ->login()
+            ->colors([
+                'primary' => \Filament\Support\Colors\Color::Green,
+            ])
+            ->discoverResources(in: app_path('Filament/Tenant/Resources'), for: 'App\\Filament\\Tenant\\Resources')
+            ->discoverPages(in: app_path('Filament/Tenant/Pages'), for: 'App\\Filament\\Tenant\\Pages')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->discoverWidgets(in: app_path('Filament/Tenant/Widgets'), for: 'App\\Filament\\Tenant\\Widgets')
+            ->widgets([
+                Widgets\AccountWidget::class,
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+            ])
+            ->plugin(TenancyTenantPlugin::make()); // 👈 Tenant plugin (IMPORTANT)
+    }
+}
+```
+
+**Key Points:**
+- The `id('tenant')` must match `tenant_panel_id` in `config/filament-tenancy.php` (default is `tenant`)
+- The plugin `TenancyTenantPlugin::make()` is added at the end with `->plugin()`
+- This panel will only be accessible from tenant domains (e.g., `tenant1.example.com/admin`)
+- Note the discovery paths: `Filament/Tenant/Resources` to keep resources separated
+
+### Step 3: Verify Configuration
+
+1. **Verify files exist:**
+   ```bash
+   # Check AdminPanelProvider
+   ls app/Providers/Filament/AdminPanelProvider.php
+   
+   # Check TenantPanelProvider
+   ls app/Providers/Filament/TenantPanelProvider.php
+   ```
+
+2. **Verify configuration in `config/filament-tenancy.php`:**
+   ```php
+   'filament' => [
+       'auto_register_plugins' => true,  // Must be true for auto-registration
+       'landlord_panel_id' => 'admin',    // Must match ->id('admin')
+       'tenant_panel_id' => 'tenant',      // Must match ->id('tenant')
+   ],
+   ```
+
+3. **Verify plugins are registered:**
+   You can run the install command to verify:
+   ```bash
+   php artisan filament-tenancy:install
+   ```
+   This command will automatically detect if plugins are correctly configured.
+
+### Step 4: Test Access
+
+#### Test Admin Panel (Landlord)
+
+1. **Access from a central domain:**
+   ```
+   https://app.example.com/admin
+   ```
+   ✅ Should work correctly
+
+2. **Try accessing from a tenant domain:**
+   ```
+   https://tenant1.example.com/admin (trying to access admin panel)
+   ```
+   ❌ Should return 403 error (Access denied)
+
+#### Test Tenant Panel
+
+1. **Access from a tenant domain:**
+   ```
+   https://tenant1.example.com/admin
+   ```
+   ✅ Should work correctly and connect to tenant database
+
+2. **Try accessing from a central domain:**
+   ```
+   https://app.example.com/admin (trying to access tenant panel)
+   ```
+   ❌ Should return 403 error (Access denied)
+
+### Summary of What's Configured
+
+After completing these steps, you will have configured:
+
+✅ **Admin Panel (Landlord)**:
+- Plugin: `TenancyLandlordPlugin`
+- Accessible from: Central domains only
+- Database: Central (landlord)
+- Auto resource: `TenantResource` to manage tenants
+
+✅ **Tenant Panel**:
+- Plugin: `TenancyTenantPlugin`
+- Accessible from: Tenant domains only
+- Database: Active tenant's database
+- Branding: Dynamic based on tenant name
+
+✅ **Security**:
+- Middlewares prevent cross-panel access
+- Admin panel cannot be accessed from tenant context
+- Tenant panel cannot be accessed without active tenant
+
+### Important Notes
+
+1. **Resource Separation**: Keep landlord and tenant resources in separate directories:
+   - Admin: `app/Filament/Resources/`
+   - Tenant: `app/Filament/Tenant/Resources/`
+
+2. **Models**: Use the correct traits:
+   - Tenant models: `BelongsToTenant`
+   - Central models: `UsesLandlordConnection`
+
+3. **Central Domains**: Configure `central_domains` in `config/filament-tenancy.php`:
+   ```php
+   'central_domains' => [
+       'app.example.com',
+       'admin.example.com',
+       env('APP_DOMAIN', 'localhost'),
+   ],
+   ```
+
 ## TenancyLandlordPlugin
 
 The landlord plugin is used for the central administration panel where all tenants are managed.

@@ -6,18 +6,28 @@ Esta carpeta contiene toda la documentación del paquete Filament Tenancy, organ
 
 ```
 docs/
-├── es/              # Documentación en Español
+├── es/                      # Documentación en Español
 │   ├── USING_PLUGINS.md
 │   ├── TESTING_INSTALL_COMMAND.md
 │   └── TECHNICAL.md
-├── en/              # Documentación en Inglés
+├── en/                      # Documentación en Inglés
 │   ├── USING_PLUGINS.md
 │   ├── TESTING_INSTALL_COMMAND.md
 │   └── TECHNICAL.md
-└── README.md        # Este archivo
+├── central-database.md      # Central Database Setup Guide
+├── resources.md             # Resources and Components
+└── README.md                # Este archivo
 ```
 
 ## Documentos Disponibles
+
+### 🏛️ central-database.md
+Guía completa de la base de datos central:
+- Configuración inicial y automatizada
+- Roles y permisos centrales
+- Comandos de administración
+- Esquema de base de datos
+- Mejores prácticas y seguridad
 
 ### 📘 USING_PLUGINS.md
 Guía completa sobre cómo usar los plugins de Filament Tenancy:
@@ -57,6 +67,7 @@ Si encuentras errores o quieres mejorar la documentación, por favor:
 ## Enlaces Rápidos
 
 - [README Principal](../README.md) - Documentación general del paquete
+- [Central Database Setup](./central-database.md) - Guía de base de datos central
 - [Configuración](../config/filament-tenancy.php) - Archivo de configuración
 - [Changelog](../CHANGELOG.md) - Historial de cambios
 

@@ -5,13 +5,17 @@ A comprehensive multi-tenancy package for Filament with support for multiple dat
 ## Features
 
 - **🚀 Easy Installation** - Interactive installer with automatic setup
+- **👥 User Management** - Create and manage tenant users with roles and permissions
+- **🔐 Roles & Permissions** - Complete Spatie-like RBAC system for tenant access control
+- **📦 Asset Sharing** - Share Livewire, Filament, and custom assets from central to tenants
+- **👥 Admin User Creation** - Interactive admin user creation during installation
 - **🗄️ Multi-database tenancy** - Complete isolation between tenants
 - **🎛️ Central tenant management** - Unified control panel for all tenants
 - **⚡ Automatic database creation and migration** - Seamless tenant provisioning
 - **🔄 Tenant-aware middleware** - Automatic context switching
 - **🎨 Filament integration** - Native Filament admin panel support
 - **🔐 Secure credential management** - Encrypted credential storage with rotation
-- **📊 Advanced logging system** - Comprehensive audit trails and monitoring
+- **📊 Enhanced Debug Logging** - Environment-aware logging with production-safe output
 - **📈 Performance monitoring** - Real-time metrics and connection monitoring
 - **🔌 Connection pooling** - Optimized database connection management
 - **💳 Plans & Subscriptions** - Built-in plan and subscription management
@@ -55,8 +59,9 @@ composer require angelitosystems/filament-tenancy
 # Publish the configuration file
 php artisan vendor:publish --tag="filament-tenancy-config"
 
-# Publish the plan seeder (optional, can be customized)
+# Publish seeders (now includes central and tenant seeders)
 php artisan vendor:publish --tag="filament-tenancy-seeders"
+php artisan vendor:publish --tag="filament-tenancy-tenant-seeders"
 
 # Publish custom 404 page components and views (optional)
 php artisan vendor:publish --tag="filament-tenancy-views"
@@ -67,7 +72,42 @@ php artisan migrate
 
 # Seed default plans (or they will be seeded automatically during installation)
 php artisan db:seed --class=Database\Seeders\PlanSeeder
+
+# Setup central database (required for landlord administration)
+php artisan filament-tenancy:setup-central --create-admin
 ```
+
+### Central Database Setup
+
+After installation, you need to set up the central database with roles and permissions for the landlord/central administration:
+
+```bash
+# Complete central database setup (recommended)
+php artisan filament-tenancy:setup-central --create-admin
+
+# Or step by step:
+php artisan migrate --path="packages/filament-tenancy/database/migrations"
+php artisan filament-tenancy:seed-central
+php artisan filament-tenancy:create-central-admin
+```
+
+The central database setup includes:
+- 🏛️ **Central Roles & Permissions**: Separate permission system for central administration
+- 👑 **Super Admin Role**: Complete access to all central features
+- 🛡️ **Landlord Admin Role**: Manage tenants, plans, and subscriptions
+- 🎧 **Support Role**: Read-only access for support staff
+- 👤 **Central Admin User**: Automatically created with Super Admin role
+
+**Central Permissions Available:**
+- `manage tenants` - Create, edit, delete tenants
+- `manage plans` - Manage subscription plans
+- `manage subscriptions` - Handle tenant subscriptions
+- `manage central users` - Manage central admin users
+- `manage central roles` - Manage central roles and permissions
+- `view central dashboard` - Access central dashboard
+- `manage system settings` - Configure system-wide settings
+- `access landlord panel` - Access landlord administration panel
+- `manage tenant databases` - Manage tenant database operations
 
 ### Requirements
 
@@ -186,6 +226,35 @@ The command will guide you through:
 - **Automatic .env Updates**: The `APP_DOMAIN` variable is automatically added or updated in your `.env` file
 - **Subdomain Support**: When using subdomains, the full domain is automatically constructed using `APP_DOMAIN` (e.g., `tenant.APP_DOMAIN`)
 
+#### Creating Tenant Users
+
+Create users for specific tenants with roles and permissions:
+
+```bash
+# Interactive mode
+php artisan tenant:user-create
+
+# Non-interactive mode
+php artisan tenant:user-create \
+    --tenant="my-tenant" \
+    --name="John Doe" \
+    --email="john@example.com" \
+    --role="admin" \
+    --permissions="manage users,view dashboard"
+
+# List available options
+php artisan tenant:user-create --list-tenants
+php artisan tenant:user-create --tenant="my-tenant" --list-roles
+php artisan tenant:user-create --tenant="my-tenant" --list-permissions
+```
+
+**Features:**
+- Interactive tenant selection with numbered options
+- Automatic password generation
+- Role and permission assignment
+- Email validation
+- Comprehensive user information display
+
 #### Using Artisan Commands (Non-Interactive)
 
 ```bash
@@ -233,6 +302,62 @@ Tenancy::switchToCentral();
 ```
 
 ### Working with Models
+
+#### User Model with Roles & Permissions
+
+Add the `HasRoles` trait to your User model to enable role-based access control:
+
+```php
+<?php
+
+namespace App\Models;
+
+use AngelitoSystems\FilamentTenancy\Concerns\HasRoles;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+
+class User extends Authenticatable
+{
+    use HasRoles;
+    
+    // Your model code...
+}
+```
+
+#### Using Roles and Permissions
+
+```php
+// Assign roles
+$user->assignRole('admin');
+$user->syncRoles(['admin', 'editor']);
+
+// Check roles
+$user->hasRole('admin');
+$user->hasAnyRole(['admin', 'editor']);
+
+// Assign permissions
+$user->givePermissionTo('manage users');
+$user->syncPermissions(['manage users', 'view dashboard']);
+
+// Check permissions
+$user->hasPermissionTo('manage users');
+$user->hasAnyPermission(['manage users', 'edit posts']);
+```
+
+#### Asset Sharing
+
+Use the `tenant_asset()` helper to access shared assets:
+
+```blade
+<!-- In Blade templates -->
+<link href="{{ tenant_asset('css/app.css') }}" rel="stylesheet">
+<script src="{{ tenant_asset('livewire/livewire.js') }}" defer></script>
+<link href="{{ tenant_asset('filament/assets/app.css') }}" rel="stylesheet">
+```
+
+The helper automatically:
+1. Checks for the asset in the tenant's storage disk
+2. Falls back to the central storage disk if not found
+3. Uses Laravel's `asset()` helper as final fallback
 
 #### Tenant Models
 
@@ -492,6 +617,46 @@ Run the package tests:
 composer test
 ```
 
+## Debug Logging
+
+The package includes enhanced debug logging that is environment-aware:
+
+### DebugHelper Class
+
+The `DebugHelper` class provides environment-aware logging:
+
+```php
+use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
+
+// Only logs when APP_ENV=local AND APP_DEBUG=true
+DebugHelper::info('Tenant created', ['tenant_id' => $tenant->id]);
+DebugHelper::debug('Connection details', $connectionData);
+DebugHelper::warning('Potential issue detected', $context);
+
+// Always logs regardless of environment
+DebugHelper::error('Critical error occurred', $errorData);
+DebugHelper::critical('System failure', $criticalData);
+```
+
+### Environment Configuration
+
+```env
+# Enable debug logging
+APP_ENV=local
+APP_DEBUG=true
+
+# Production settings (logs only errors/criticals)
+APP_ENV=production
+APP_DEBUG=false
+```
+
+### Log Behavior
+
+- **Development (APP_ENV=local, APP_DEBUG=true)**: All logs are visible
+- **Production (APP_ENV=production OR APP_DEBUG=false)**: Only errors and criticals are logged
+- **Debug/Info/Warning**: Only shown in development environment
+- **Error/Critical**: Always logged regardless of environment
+
 ## Security
 
 This package includes several security features:
@@ -558,6 +723,57 @@ To ensure compliance:
 **Current License**: MIT License (subject to above restrictions)
 
 For complete license terms, please read the [LICENSE](LICENSE) file.
+
+## Available Commands
+
+### Central Database Commands
+
+```bash
+# Complete central database setup with admin creation
+php artisan filament-tenancy:setup-central --create-admin
+
+# Seed central database with roles and permissions
+php artisan filament-tenancy:seed-central
+
+# Create central admin user with Super Admin role
+php artisan filament-tenancy:create-central-admin
+```
+
+### Tenant Management Commands
+
+```bash
+# Interactive tenant creation
+php artisan tenancy:create
+
+# List all tenants
+php artisan tenancy:list
+
+# Delete a tenant
+php artisan tenancy:delete
+
+# Create tenant user with roles
+php artisan tenant:user-create
+```
+
+### Migration Commands
+
+```bash
+# Run migrations for specific tenant
+php artisan tenant:migrate
+
+# Rollback tenant migrations
+php artisan tenant:rollback
+
+# Fresh tenant database
+php artisan tenant:fresh
+```
+
+### Monitoring Commands
+
+```bash
+# Monitor tenant connections
+php artisan filament-tenancy:monitor-connections
+```
 
 ## Credits
 

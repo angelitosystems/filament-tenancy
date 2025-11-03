@@ -5,12 +5,12 @@ namespace AngelitoSystems\FilamentTenancy\Support;
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
 use AngelitoSystems\FilamentTenancy\Support\Contracts\ConnectionManagerInterface;
 use AngelitoSystems\FilamentTenancy\Support\Contracts\CredentialManagerInterface;
+use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
 use AngelitoSystems\FilamentTenancy\Support\Exceptions\ConnectionException;
 use AngelitoSystems\FilamentTenancy\Support\TenancyLogger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ConnectionManager implements ConnectionManagerInterface
@@ -21,7 +21,7 @@ class ConnectionManager implements ConnectionManagerInterface
     protected array $connectionPool = [];
     protected string $originalConnection;
 
-    public function __construct(CredentialManagerInterface $credentialManager, TenancyLogger $logger = null)
+    public function __construct(CredentialManagerInterface $credentialManager, ?TenancyLogger $logger = null)
     {
         $this->credentialManager = $credentialManager;
         $this->logger = $logger ?? app(TenancyLogger::class);
@@ -467,7 +467,7 @@ class ConnectionManager implements ConnectionManagerInterface
             try {
                 return decrypt(Str::after($password, 'encrypted:'));
             } catch (\Exception $e) {
-                Log::warning('Failed to decrypt database password', ['error' => $e->getMessage()]);
+                DebugHelper::warning('Failed to decrypt database password', ['error' => $e->getMessage()]);
                 return $password;
             }
         }
@@ -501,8 +501,7 @@ class ConnectionManager implements ConnectionManagerInterface
             'timestamp' => now()->toISOString(),
         ];
 
-        Log::channel(config('filament-tenancy.logging.channel', 'default'))
-           ->info("Database connection {$action}", $context);
+        DebugHelper::info("Database connection {$action}", $context);
     }
 
     /**
@@ -520,8 +519,7 @@ class ConnectionManager implements ConnectionManagerInterface
             'timestamp' => now()->toISOString(),
         ];
 
-        Log::channel(config('filament-tenancy.logging.channel', 'default'))
-           ->error("Database connection {$action}", $context);
+        DebugHelper::error("Database connection {$action}", $context);
     }
 
     /**

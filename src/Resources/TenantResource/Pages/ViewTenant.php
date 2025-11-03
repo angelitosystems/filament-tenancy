@@ -6,7 +6,11 @@ use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource;
 use Filament\Actions;
 use Filament\Infolists;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\KeyValueEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class ViewTenant extends ViewRecord
@@ -20,16 +24,16 @@ class ViewTenant extends ViewRecord
             Actions\Action::make('visit_tenant')
                 ->label('Visit Tenant')
                 ->icon('heroicon-o-arrow-top-right-on-square')
-                ->url(fn () => $this->record->getUrl())
+                ->url(fn() => $this->record->getUrl())
                 ->openUrlInNewTab()
-                ->visible(fn () => $this->record->isActive()),
+                ->visible(fn() => $this->record->isActive()),
             Actions\Action::make('run_migrations')
                 ->label('Run Migrations')
                 ->icon('heroicon-o-cog-6-tooth')
                 ->action(function () {
                     try {
                         Tenancy::database()->runTenantMigrations($this->record);
-                        
+
                         \Filament\Notifications\Notification::make()
                             ->title('Migrations completed')
                             ->body('Tenant migrations have been run successfully.')
@@ -53,85 +57,73 @@ class ViewTenant extends ViewRecord
         return $schema
             ->columns(2)
             ->components([
-                Infolists\Components\Section::make('Basic Information')
+                Section::make('Basic Information')
                     ->schema([
-                        Infolists\Components\TextEntry::make('id')
+                        TextEntry::make('id')
                             ->label('ID'),
-                        Infolists\Components\TextEntry::make('name'),
-                        Infolists\Components\TextEntry::make('slug'),
-                        Infolists\Components\IconEntry::make('is_active')
+                        TextEntry::make('name'),
+                        TextEntry::make('slug'),
+                        IconEntry::make('is_active')
                             ->label('Active')
                             ->boolean(),
-                        Infolists\Components\TextEntry::make('plan')
+                        TextEntry::make('plan')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
+                            ->color(fn(string $state): string => match ($state) {
                                 'basic' => 'gray',
                                 'premium' => 'warning',
                                 'enterprise' => 'success',
                                 default => 'gray',
                             })
                             ->placeholder('No plan'),
-                        Infolists\Components\TextEntry::make('expires_at')
+                        TextEntry::make('expires_at')
                             ->label('Expires')
                             ->date()
                             ->placeholder('Never'),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Infolists\Components\Section::make('Domain Configuration')
+                Section::make('Domain Configuration')
                     ->schema([
-                        Infolists\Components\TextEntry::make('domain')
+                        TextEntry::make('domain')
                             ->label('Custom Domain')
                             ->placeholder('Not set'),
-                        Infolists\Components\TextEntry::make('subdomain')
+                        TextEntry::make('subdomain')
                             ->label('Subdomain')
                             ->placeholder('Not set'),
-                        Infolists\Components\TextEntry::make('full_domain')
+                        TextEntry::make('full_domain')
                             ->label('Full URL')
-                            ->state(fn () => $this->record->getUrl())
-                            ->url(fn () => $this->record->getUrl())
+                            ->state(fn() => $this->record->getUrl())
+                            ->url(fn() => $this->record->getUrl())
                             ->openUrlInNewTab(),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Infolists\Components\Section::make('Database Configuration')
+                Section::make('Timestamps')
                     ->schema([
-                        Infolists\Components\TextEntry::make('database_name')
-                            ->label('Database Name'),
-                        Infolists\Components\TextEntry::make('database_host')
-                            ->label('Database Host')
-                            ->placeholder('Default'),
-                        Infolists\Components\TextEntry::make('database_port')
-                            ->label('Database Port')
-                            ->placeholder('Default'),
-                        Infolists\Components\TextEntry::make('database_username')
-                            ->label('Database Username')
-                            ->placeholder('Default'),
-                    ])
-                    ->columns(2),
-
-                Infolists\Components\Section::make('Timestamps')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('created_at')
+                        TextEntry::make('created_at')
                             ->label('Created')
                             ->dateTime(),
-                        Infolists\Components\TextEntry::make('updated_at')
+                        TextEntry::make('updated_at')
                             ->label('Updated')
                             ->dateTime(),
-                        Infolists\Components\TextEntry::make('deleted_at')
+                        TextEntry::make('deleted_at')
                             ->label('Deleted')
                             ->dateTime()
                             ->placeholder('Not deleted'),
                     ])
-                    ->columns(3),
+                    ->columns(3)
+                    ->columnSpanFull(),
 
-                Infolists\Components\Section::make('Additional Data')
+                Section::make('Additional Data')
                     ->schema([
-                        Infolists\Components\KeyValueEntry::make('data')
+                        KeyValueEntry::make('data')
                             ->label('Custom Data')
                             ->placeholder('No additional data'),
                     ])
-                    ->visible(fn () => !empty($this->record->data)),
+                    ->visible(fn() => !empty($this->record->data))
+                    ->columnSpanFull(),
             ]);
     }
 }

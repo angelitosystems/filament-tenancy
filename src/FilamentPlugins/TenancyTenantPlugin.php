@@ -6,8 +6,13 @@ use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\EnsureTenantAccess;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventLandlordAccess;
+use AngelitoSystems\FilamentTenancy\Middleware\SetLocale;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource as TenantPlanResource;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\RoleResource as TenantRoleResource;
+use AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Illuminate\Support\Facades\Route;
 
 class TenancyTenantPlugin implements Plugin
 {
@@ -39,6 +44,7 @@ class TenancyTenantPlugin implements Plugin
             InitializeTenancy::class,
             EnsureTenantAccess::class,
             PreventLandlordAccess::class,
+            SetLocale::class,
             ...$this->middleware,
         ]);
 
@@ -47,6 +53,13 @@ class TenancyTenantPlugin implements Plugin
             $tenant = Tenancy::current();
             return $tenant ? $tenant->name : config('app.name');
         });
+
+        // Add language switcher if enabled
+        if (config('filament-tenancy.localization.enabled', true) && 
+            config('filament-tenancy.localization.show_language_switcher', true)) {
+            
+            $panel->userMenuItems($this->getLanguageMenuItems());
+        }
 
         // Note: In Filament 4, database connection is handled at model level via traits
         // Tenant models should use BelongsToTenant trait to use tenant connections
@@ -64,6 +77,43 @@ class TenancyTenantPlugin implements Plugin
         // Boot logic for tenant plugin
         if ($this->autoRegister) {
             $this->registerTenantResources($panel);
+        }
+    }
+
+    /**
+     * Get language menu items for the user menu.
+     */
+    protected function getLanguageMenuItems(): array
+    {
+        $currentLocale = LanguageSwitcher::getCurrentLocale();
+        
+        // Solo mostrar el idioma opuesto al actual
+        if ($currentLocale === 'es') {
+            return [
+                'language_en' => \Filament\Navigation\MenuItem::make('English')
+                    ->label('🇺🇸 English')
+                    ->icon('heroicon-o-language')
+                    ->url(fn() => Route::has('language.switch') 
+                        ? route('language.switch', 'en') 
+                        : (Route::has('language.switch.alt') 
+                            ? route('language.switch.alt', 'en')
+                            : (Route::has('language.switch.post')
+                                ? route('language.switch.post', 'en')
+                                : '#'))),
+            ];
+        } else {
+            return [
+                'language_es' => \Filament\Navigation\MenuItem::make('Español')
+                    ->label('🇪🇸 Español')
+                    ->icon('heroicon-o-language')
+                    ->url(fn() => Route::has('language.switch') 
+                        ? route('language.switch', 'es') 
+                        : (Route::has('language.switch.alt') 
+                            ? route('language.switch.alt', 'es')
+                            : (Route::has('language.switch.post')
+                                ? route('language.switch.post', 'es')
+                                : '#'))),
+            ];
         }
     }
 
@@ -108,7 +158,13 @@ class TenancyTenantPlugin implements Plugin
      */
     protected function registerTenantResources(Panel $panel): void
     {
-        // Auto-discover and register tenant resources
+        // Register built-in tenant resources
+        $panel->resources([
+            TenantPlanResource::class,
+            TenantRoleResource::class,
+        ]);
+
+        // Auto-discover and register additional tenant resources
         $tenantResourcesPath = config('filament-tenancy.tenant_resources_path');
         
         if ($tenantResourcesPath && is_dir($tenantResourcesPath)) {

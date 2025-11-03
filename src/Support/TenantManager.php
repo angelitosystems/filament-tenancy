@@ -113,6 +113,11 @@ class TenantManager
             $this->databaseManager->runTenantMigrations($tenant);
         }
 
+        // Run tenant seeders if configured
+        if (config('filament-tenancy.seeders.auto_run', true)) {
+            $this->databaseManager->runTenantSeeders($tenant);
+        }
+
         // Fire event
         event(new TenantCreated($tenant));
 

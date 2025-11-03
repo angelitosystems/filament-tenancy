@@ -5,9 +5,16 @@ namespace AngelitoSystems\FilamentTenancy\FilamentPlugins;
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventTenantAccess;
+use AngelitoSystems\FilamentTenancy\Middleware\SetLocale;
+use AngelitoSystems\FilamentTenancy\Resources\PlanResource;
+use AngelitoSystems\FilamentTenancy\Resources\SubscriptionResource;
+use AngelitoSystems\FilamentTenancy\Resources\RoleResource;
+use AngelitoSystems\FilamentTenancy\Resources\PermissionResource;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource;
+use AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
+use Illuminate\Support\Facades\Route;
 
 class TenancyLandlordPlugin implements Plugin
 {
@@ -38,11 +45,19 @@ class TenancyLandlordPlugin implements Plugin
         $panel->middleware([
             InitializeTenancy::class,
             PreventTenantAccess::class,
+            SetLocale::class,
             ...$this->middleware,
         ]);
 
         // Configure panel for landlord context
         $panel->brandName(config('app.name', 'Landlord Panel'));
+
+        // Add language switcher if enabled
+        if (config('filament-tenancy.localization.enabled', true) && 
+            config('filament-tenancy.localization.show_language_switcher', true)) {
+            
+            $panel->userMenuItems($this->getLanguageMenuItems());
+        }
 
         // Note: In Filament 4, database connection is handled at model level, not panel level
         // The default Laravel connection will be used automatically
@@ -51,6 +66,10 @@ class TenancyLandlordPlugin implements Plugin
         if ($this->autoRegister) {
             $panel->resources([
                 TenantResource::class,
+                PlanResource::class,
+                SubscriptionResource::class,
+                RoleResource::class,
+                PermissionResource::class,
                 ...$this->resources,
             ]);
         }
@@ -70,6 +89,43 @@ class TenancyLandlordPlugin implements Plugin
 
         // Ensure we're always in central context for landlord panel
         Tenancy::switchToCentral();
+    }
+
+    /**
+     * Get language menu items for the user menu.
+     */
+    protected function getLanguageMenuItems(): array
+    {
+        $currentLocale = LanguageSwitcher::getCurrentLocale();
+        
+        // Solo mostrar el idioma opuesto al actual
+        if ($currentLocale === 'es') {
+            return [
+                'language_en' => \Filament\Navigation\MenuItem::make('English')
+                    ->label('🇺🇸 English')
+                    ->icon('heroicon-o-language')
+                    ->url(fn() => Route::has('language.switch') 
+                        ? route('language.switch', 'en') 
+                        : (Route::has('language.switch.alt') 
+                            ? route('language.switch.alt', 'en')
+                            : (Route::has('language.switch.post')
+                                ? route('language.switch.post', 'en')
+                                : '#'))),
+            ];
+        } else {
+            return [
+                'language_es' => \Filament\Navigation\MenuItem::make('Español')
+                    ->label('🇪🇸 Español')
+                    ->icon('heroicon-o-language')
+                    ->url(fn() => Route::has('language.switch') 
+                        ? route('language.switch', 'es') 
+                        : (Route::has('language.switch.alt') 
+                            ? route('language.switch.alt', 'es')
+                            : (Route::has('language.switch.post')
+                                ? route('language.switch.post', 'es')
+                                : '#'))),
+            ];
+        }
     }
 
     /**

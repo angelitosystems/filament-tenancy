@@ -3,12 +3,12 @@
 namespace AngelitoSystems\FilamentTenancy\Support;
 
 use AngelitoSystems\FilamentTenancy\Support\Contracts\CredentialManagerInterface;
-use AngelitoSystems\FilamentTenancy\Support\Exceptions\ConnectionException;
+use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
+use AngelitoSystems\FilamentTenancy\Support\TenancyLogger;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CredentialManager implements CredentialManagerInterface
@@ -185,7 +185,7 @@ class CredentialManager implements CredentialManagerInterface
             $encrypter = new \Illuminate\Encryption\Encrypter($this->encryptionKey, config('app.cipher', 'AES-256-CBC'));
             return 'encrypted:' . $encrypter->encryptString($value);
         } catch (\Exception $e) {
-            Log::warning('Failed to encrypt credential', ['error' => $e->getMessage()]);
+            DebugHelper::warning('Failed to encrypt credential', ['error' => $e->getMessage()]);
             return $value;
         }
     }
@@ -204,7 +204,7 @@ class CredentialManager implements CredentialManagerInterface
             $encrypter = new \Illuminate\Encryption\Encrypter($this->encryptionKey, config('app.cipher', 'AES-256-CBC'));
             return $encrypter->decryptString(Str::after($value, 'encrypted:'));
         } catch (\Exception $e) {
-            Log::warning('Failed to decrypt credential', ['error' => $e->getMessage()]);
+            DebugHelper::warning('Failed to decrypt credential', ['error' => $e->getMessage()]);
             return $value;
         }
     }
@@ -415,7 +415,7 @@ class CredentialManager implements CredentialManagerInterface
                         $oldEncrypter = new \Illuminate\Encryption\Encrypter($oldKey, config('app.cipher', 'AES-256-CBC'));
                         $decrypted = $oldEncrypter->decryptString(Str::after($encryptedValue, 'encrypted:'));
                     } catch (\Exception $e) {
-                        Log::warning('Failed to decrypt credential during key rotation', ['error' => $e->getMessage()]);
+                        DebugHelper::warning('Failed to decrypt credential during key rotation', ['error' => $e->getMessage()]);
                         continue;
                     }
                 } else {

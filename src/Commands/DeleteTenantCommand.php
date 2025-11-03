@@ -13,7 +13,8 @@ class DeleteTenantCommand extends Command
     protected $signature = 'tenancy:delete 
                             {tenant : The tenant ID or slug to delete}
                             {--force : Force deletion without confirmation}
-                            {--keep-database : Keep the tenant database (do not delete)}';
+                            {--keep-database : Keep the tenant database (do not delete)}
+                            {--delete-database : Delete the tenant database (default behavior)}';
 
     /**
      * The console command description.
@@ -28,6 +29,7 @@ class DeleteTenantCommand extends Command
         $tenantIdentifier = $this->argument('tenant');
         $force = $this->option('force');
         $keepDatabase = $this->option('keep-database');
+        $deleteDatabase = $this->option('delete-database');
 
         try {
             // Find tenant by ID or slug
@@ -59,51 +61,53 @@ class DeleteTenantCommand extends Command
                 ]
             );
 
+            // Default behavior: delete database unless explicitly told to keep it
+            $willDeleteDatabase = !$keepDatabase;
+
             // Confirmation
             if (!$force) {
-                $databaseAction = $keepDatabase ? 'kept' : 'deleted';
+                $databaseAction = $willDeleteDatabase ? 'DELETED' : 'KEPT';
                 $confirmed = $this->confirm(
-                    "Are you sure you want to delete tenant '{$tenant->name}'? " .
-                    "The tenant database will be {$databaseAction}."
+                    "⚠️  Are you sure you want to delete tenant '{$tenant->name}' and ALL its data? " .
+                    "The tenant database '{$tenant->database_name}' will be {$databaseAction}. " .
+                    "This action is IRREVERSIBLE!"
                 );
 
                 if (!$confirmed) {
-                    $this->info('Deletion cancelled.');
+                    $this->info('❌ Deletion cancelled.');
                     return self::SUCCESS;
                 }
             }
 
-            // Temporarily override database deletion setting if --keep-database is used
+            // Force database deletion for this operation
             $originalSetting = config('filament-tenancy.database.auto_delete_tenant_database');
-            if ($keepDatabase) {
-                config(['filament-tenancy.database.auto_delete_tenant_database' => false]);
-            }
+            config(['filament-tenancy.database.auto_delete_tenant_database' => $willDeleteDatabase]);
 
             // Delete tenant
-            $this->info('Deleting tenant...');
+            $this->info('🗑️  Deleting tenant and all related data...');
             $deleted = Tenancy::deleteTenant($tenant);
 
             // Restore original setting
-            if ($keepDatabase) {
-                config(['filament-tenancy.database.auto_delete_tenant_database' => $originalSetting]);
-            }
+            config(['filament-tenancy.database.auto_delete_tenant_database' => $originalSetting]);
 
             if ($deleted) {
-                $this->info("Tenant '{$tenant->name}' deleted successfully!");
+                $this->info("✅ Tenant '{$tenant->name}' deleted successfully!");
                 
-                if ($keepDatabase) {
-                    $this->warn("Database '{$tenant->database_name}' was kept as requested.");
-                } elseif (config('filament-tenancy.database.auto_delete_tenant_database')) {
-                    $this->info("Database '{$tenant->database_name}' was also deleted.");
+                if ($willDeleteDatabase) {
+                    $this->info("🗑️  Database '{$tenant->database_name}' was also deleted.");
+                } else {
+                    $this->warn("⚠️  Database '{$tenant->database_name}' was kept as requested.");
                 }
+                
+                $this->line("🎉 All tenant data including users, roles, permissions, and subscriptions have been removed.");
             } else {
-                $this->error('Failed to delete tenant.');
+                $this->error('❌ Failed to delete tenant.');
                 return self::FAILURE;
             }
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Failed to delete tenant: ' . $e->getMessage());
+            $this->error('❌ Failed to delete tenant: ' . $e->getMessage());
             return self::FAILURE;
         }
     }

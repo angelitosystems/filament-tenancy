@@ -3,20 +3,22 @@
 namespace AngelitoSystems\FilamentTenancy\Support;
 
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
-use AngelitoSystems\FilamentTenancy\Support\Contracts\ConnectionManagerInterface;
+use AngelitoSystems\FilamentTenancy\Support\ConnectionManager;
+use AngelitoSystems\FilamentTenancy\Support\DebugHelper;
 use Illuminate\Database\DatabaseManager as IlluminateDatabaseManager;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class DatabaseManager
 {
     protected IlluminateDatabaseManager $databaseManager;
-    protected ConnectionManagerInterface $connectionManager;
+    protected ConnectionManager $connectionManager;
     protected string $originalConnection;
 
-    public function __construct(IlluminateDatabaseManager $databaseManager, ConnectionManagerInterface $connectionManager)
+    public function __construct(IlluminateDatabaseManager $databaseManager, ConnectionManager $connectionManager)
     {
         $this->databaseManager = $databaseManager;
         $this->connectionManager = $connectionManager;
@@ -30,7 +32,7 @@ class DatabaseManager
     {
         $this->connectionManager->switchToTenant($tenant);
         
-        Log::info('Switched to tenant database', [
+        DebugHelper::info('Switched to tenant database', [
             'tenant_id' => $tenant->id,
             'connection' => $this->connectionManager->getTenantConnectionName($tenant),
         ]);
@@ -43,7 +45,7 @@ class DatabaseManager
     {
         $this->connectionManager->switchToCentral();
         
-        Log::info('Switched to central database', [
+        DebugHelper::info('Switched to central database', [
             'connection' => $this->originalConnection,
         ]);
     }
@@ -72,7 +74,7 @@ class DatabaseManager
 
             // SQLite doesn't support CREATE DATABASE
             if ($driver === 'sqlite') {
-                Log::warning('SQLite does not support multi-database tenancy. Skipping database creation.', [
+                DebugHelper::warning('SQLite does not support multi-database tenancy. Skipping database creation.', [
                     'tenant_id' => $tenant->id,
                 ]);
                 return false;
@@ -97,7 +99,7 @@ class DatabaseManager
                 ->statement("CREATE DATABASE IF NOT EXISTS `{$databaseName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
             }
 
-            Log::info('Created tenant database', [
+            DebugHelper::info('Created tenant database', [
                 'tenant_id' => $tenant->id,
                 'database' => $databaseName,
                 'driver' => $driver,
@@ -105,7 +107,7 @@ class DatabaseManager
 
             return true;
         } catch (\Exception $e) {
-            Log::error("Failed to create tenant database: {$e->getMessage()}", [
+            DebugHelper::error("Failed to create tenant database: {$e->getMessage()}", [
                 'tenant_id' => $tenant->id,
             ]);
             return false;
@@ -140,14 +142,14 @@ class DatabaseManager
             DB::connection($tempConnectionName)
                 ->statement("DROP DATABASE IF EXISTS `{$databaseName}`");
 
-            Log::info('Deleted tenant database', [
+            DebugHelper::info('Deleted tenant database', [
                 'tenant_id' => $tenant->id,
                 'database' => $databaseName,
             ]);
 
             return true;
         } catch (\Exception $e) {
-            Log::error("Failed to delete tenant database: {$e->getMessage()}", [
+            DebugHelper::error("Failed to delete tenant database: {$e->getMessage()}", [
                 'tenant_id' => $tenant->id,
             ]);
             return false;
@@ -266,46 +268,31 @@ class DatabaseManager
     }
 
     /**
-     * Run migrations for tenant.
+     * Ensure the sessions table exists in the tenant database.
      */
-    public function runTenantMigrations(Tenant $tenant): bool
+    protected function ensureSessionsTableExists(Tenant $tenant): void
     {
         try {
-            $driver = env('DB_CONNECTION', 'mysql');
+            $connectionName = $this->getTenantConnectionName($tenant);
             
-            // SQLite doesn't support multi-database tenancy
-            if ($driver === 'sqlite') {
-                Log::warning('SQLite does not support multi-database tenancy. Skipping tenant migrations.', [
+            if (!Schema::connection($connectionName)->hasTable('sessions')) {
+                Schema::connection($connectionName)->create('sessions', function (Blueprint $table) {
+                    $table->string('id')->primary();
+                    $table->foreignId('user_id')->nullable()->index();
+                    $table->string('ip_address', 45)->nullable();
+                    $table->text('user_agent')->nullable();
+                    $table->text('payload');
+                    $table->integer('last_activity')->index();
+                });
+
+                DebugHelper::info('Created sessions table for tenant', [
                     'tenant_id' => $tenant->id,
+                    'connection' => $connectionName,
                 ]);
-                return false;
             }
-
-            // Ensure database exists before switching
-            if (!$this->tenantDatabaseExists($tenant)) {
-                if (!$this->createTenantDatabase($tenant)) {
-                    throw new \Exception('Failed to create tenant database');
-                }
-            }
-
-            $this->switchToTenant($tenant);
-
-            // Run migrations
-            Artisan::call('migrate', [
-                '--database' => $this->getTenantConnectionName($tenant),
-                '--path' => config('filament-tenancy.migrations.paths', []),
-                '--force' => true,
-            ]);
-
-            $this->switchToCentral();
-
-            return true;
         } catch (\Exception $e) {
-            $this->switchToCentral();
-            Log::error("Failed to run tenant migrations: {$e->getMessage()}", [
-                'tenant_id' => $tenant->id,
-            ]);
-            return false;
+            DebugHelper::error("Failed to create sessions table for tenant {$tenant->id}: {$e->getMessage()}");
+            // Don't throw exception, just log it as sessions table is not critical
         }
     }
 
@@ -359,5 +346,300 @@ class DatabaseManager
         $this->databaseManager->setDefaultConnection($originalConnection);
         
         return $tenant;
+    }
+
+    /**
+     * Run tenant migrations from project's database/migrations/tenant/*.
+     */
+    public function runTenantMigrations(Tenant $tenant): bool
+    {
+        try {
+            // Switch to tenant context
+            $this->switchToTenant($tenant);
+            
+            // Ensure we're using the tenant connection
+            $tenantConnection = $this->getTenantConnectionName($tenant);
+            
+            DebugHelper::info('Starting tenant migrations', [
+                'tenant_id' => $tenant->id,
+                'tenant_connection' => $tenantConnection,
+                'current_default_connection' => config('database.default'),
+            ]);
+
+            // Get tenant migration path from project (not package)
+            $tenantMigrationPath = database_path('migrations/tenant');
+            
+            if (!is_dir($tenantMigrationPath)) {
+                DebugHelper::info('No tenant migrations directory found in project', [
+                    'tenant_id' => $tenant->id,
+                    'path' => $tenantMigrationPath,
+                ]);
+                return true; // Not an error, just no migrations to run
+            }
+
+            // Get migration files
+            $migrationFiles = glob($tenantMigrationPath . '/*.php');
+            
+            if (empty($migrationFiles)) {
+                DebugHelper::info('No tenant migration files found in project', [
+                    'tenant_id' => $tenant->id,
+                    'path' => $tenantMigrationPath,
+                ]);
+                return true;
+            }
+
+            DebugHelper::info('Running tenant migrations from project', [
+                'tenant_id' => $tenant->id,
+                'migration_count' => count($migrationFiles),
+                'path' => $tenantMigrationPath,
+            ]);
+
+            // Create migrations table if it doesn't exist
+            $this->ensureMigrationsTableExists();
+
+            // Run each migration
+            foreach ($migrationFiles as $migrationFile) {
+                $this->runMigrationFile($migrationFile);
+            }
+
+            DebugHelper::info('Tenant migrations completed successfully', [
+                'tenant_id' => $tenant->id,
+                'migrations_run' => count($migrationFiles),
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            DebugHelper::error("Failed to run tenant migrations for tenant {$tenant->id}: {$e->getMessage()}", [
+                'tenant_id' => $tenant->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        } finally {
+            // Always switch back to central connection
+            $this->switchToCentral();
+        }
+    }
+
+    /**
+     * Ensure migrations table exists in tenant database.
+     */
+    protected function ensureMigrationsTableExists(): void
+    {
+        $connection = config('database.default');
+        
+        DebugHelper::info("Ensuring migrations table exists", [
+            'connection' => $connection,
+        ]);
+        
+        if (!Schema::connection($connection)->hasTable('migrations')) {
+            Schema::connection($connection)->create('migrations', function (Blueprint $table) {
+                $table->id();
+                $table->string('migration');
+                $table->integer('batch');
+            });
+            
+            DebugHelper::info("Created migrations table on tenant connection", [
+                'connection' => $connection,
+            ]);
+        }
+    }
+
+    /**
+     * Run a single migration file.
+     */
+    protected function runMigrationFile(string $migrationFile): void
+    {
+        $migrationName = basename($migrationFile, '.php');
+        
+        // Get current tenant connection (should be set by switchToTenant)
+        $connection = config('database.default');
+        
+        DebugHelper::info("Running migration on connection", [
+            'migration' => $migrationName,
+            'connection' => $connection,
+        ]);
+        
+        // Check if migration already ran (use specific connection)
+        $ran = DB::connection($connection)
+            ->table('migrations')
+            ->where('migration', $migrationName)
+            ->exists();
+
+        if ($ran) {
+            DebugHelper::debug("Migration already run: {$migrationName}");
+            return;
+        }
+
+        // Include and run migration
+        require_once $migrationFile;
+        
+        $migrationClass = $this->getMigrationClassFromFile($migrationFile);
+        
+        if (class_exists($migrationClass)) {
+            // Store the current database connection
+            $originalConnection = config('database.default');
+            
+            try {
+                // Set the connection for the migration
+                Config::set('database.default', $connection);
+                
+                // Create a new instance of the migration
+                $migration = new $migrationClass();
+                
+                DebugHelper::info("Executing migration up() method", [
+                    'migration_class' => $migrationClass,
+                    'connection' => $connection,
+                ]);
+                
+                // Run the migration
+                $migration->up();
+                
+                // Record the migration in the migrations table
+                $batch = DB::connection($connection)
+                    ->table('migrations')
+                    ->max('batch') + 1;
+                
+                DB::connection($connection)->table('migrations')->insert([
+                    'migration' => $migrationName,
+                    'batch' => $batch,
+                ]);
+                
+                DebugHelper::info("Migration completed successfully", [
+                    'migration' => $migrationName,
+                    'batch' => $batch,
+                ]);
+                
+            } catch (\Exception $e) {
+                DebugHelper::error("Migration failed: " . $e->getMessage(), [
+                    'migration' => $migrationName,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                throw $e;
+            } finally {
+                // Always restore the original connection
+                Config::set('database.default', $originalConnection);
+            }
+
+            // Record migration (use specific connection)
+            DB::connection($connection)->table('migrations')->insert([
+                'migration' => $migrationName,
+                'batch' => DB::connection($connection)->table('migrations')->max('batch') + 1,
+            ]);
+
+            DebugHelper::debug("Migration completed: {$migrationName}");
+        }
+    }
+
+    /**
+     * Get migration class name from file.
+     */
+    protected function getMigrationClassFromFile(string $migrationFile): string
+    {
+        $content = file_get_contents($migrationFile);
+        
+        // Extract class name using regex
+        if (preg_match('/class\s+(\w+)/', $content, $matches)) {
+            return $matches[1];
+        }
+
+        throw new \Exception("Could not determine migration class from file: {$migrationFile}");
+    }
+
+    /**
+     * Run tenant seeders from project's database/seeders/tenant/*.
+     */
+    public function runTenantSeeders(Tenant $tenant): bool
+    {
+        try {
+            // Switch to tenant context
+            $this->switchToTenant($tenant);
+
+            // Get configured seeder classes from config
+            $seederClasses = config('filament-tenancy.seeders.classes', []);
+            
+            if (empty($seederClasses)) {
+                DebugHelper::info('No tenant seeder classes configured', [
+                    'tenant_id' => $tenant->id,
+                ]);
+                return true; // Not an error, just no seeders to run
+            }
+
+            DebugHelper::info('Running tenant seeders', [
+                'tenant_id' => $tenant->id,
+                'seeder_count' => count($seederClasses),
+                'seeders' => $seederClasses,
+            ]);
+
+            // Run each seeder class
+            foreach ($seederClasses as $seederClass) {
+                $this->runSeederClass($seederClass, $tenant);
+            }
+
+            DebugHelper::info('Tenant seeders completed successfully', [
+                'tenant_id' => $tenant->id,
+                'seeders_run' => count($seederClasses),
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            DebugHelper::error("Failed to run tenant seeders for tenant {$tenant->id}: {$e->getMessage()}", [
+                'tenant_id' => $tenant->id,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        } finally {
+            // Always switch back to central connection
+            $this->switchToCentral();
+        }
+    }
+
+    /**
+     * Run a specific seeder class for tenant.
+     */
+    protected function runSeederClass(string $seederClass, Tenant $tenant): void
+    {
+        try {
+            if (!class_exists($seederClass)) {
+                DebugHelper::warning("Seeder class not found: {$seederClass}", [
+                    'tenant_id' => $tenant->id,
+                    'seeder_class' => $seederClass,
+                ]);
+                return;
+            }
+
+            // Get current tenant connection
+            $connection = config('database.default');
+            
+            // Temporarily set the default connection to tenant connection for seeder
+            $originalConnection = config('database.default');
+            Config::set('database.default', $connection);
+
+            try {
+                DebugHelper::info("Running seeder: {$seederClass}", [
+                    'tenant_id' => $tenant->id,
+                    'seeder_class' => $seederClass,
+                    'connection' => $connection,
+                ]);
+
+                $seeder = new $seederClass();
+                $seeder->run();
+
+                DebugHelper::info("Seeder completed: {$seederClass}", [
+                    'tenant_id' => $tenant->id,
+                    'seeder_class' => $seederClass,
+                ]);
+            } finally {
+                // Always restore original connection
+                Config::set('database.default', $originalConnection);
+            }
+        } catch (\Exception $e) {
+            DebugHelper::error("Failed to run seeder {$seederClass}: {$e->getMessage()}", [
+                'tenant_id' => $tenant->id,
+                'seeder_class' => $seederClass,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 }

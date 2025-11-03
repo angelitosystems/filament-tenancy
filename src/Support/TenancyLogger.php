@@ -153,7 +153,13 @@ class TenancyLogger
     {
         $fullContext = array_merge($this->defaultContext, $context);
         
-        Log::channel($this->channel)->log($level, $message, $fullContext);
+        // Check if the configured log channel exists, fallback to default if not
+        $channel = $this->channel;
+        if (!config("logging.channels.{$channel}")) {
+            $channel = config('logging.default', 'single');
+        }
+        
+        Log::channel($channel)->log($level, $message, $fullContext);
     }
 
     /**
