@@ -22,7 +22,9 @@ trait HasRoles
             'model_has_roles',
             'model_id',
             'role_id'
-        )->where('model_type', static::class);
+        )
+        ->wherePivot('model_type', static::class)
+        ->withPivot('model_type');
     }
 
     /**
@@ -35,7 +37,9 @@ trait HasRoles
             'model_has_permissions',
             'model_id',
             'permission_id'
-        )->where('model_type', static::class);
+        )
+        ->wherePivot('model_type', static::class)
+        ->withPivot('model_type');
     }
 
     /**
@@ -46,7 +50,7 @@ trait HasRoles
         $role = $this->getStoredRole($role);
 
         if (!$this->hasRole($role->name)) {
-            $this->roles()->save($role);
+            $this->roles()->attach($role->id, ['model_type' => static::class]);
         }
 
         return $this;
@@ -57,11 +61,21 @@ trait HasRoles
      */
     public function syncRoles($roles): self
     {
-        $roles = collect($roles)->map(function ($role) {
+        $roleIds = collect($roles)->map(function ($role) {
+            // Si es un ID numérico, usarlo directamente
+            if (is_numeric($role)) {
+                return (int) $role;
+            }
+            // Si es un string o Role, buscar/obtener el ID
             return $this->getStoredRole($role)->id;
-        });
+        })->filter()->values()->toArray();
 
-        $this->roles()->sync($roles);
+        $syncData = [];
+        foreach ($roleIds as $roleId) {
+            $syncData[$roleId] = ['model_type' => static::class];
+        }
+
+        $this->roles()->sync($syncData);
 
         return $this;
     }
@@ -197,7 +211,7 @@ trait HasRoles
         $permission = $this->getStoredPermission($permission);
 
         if (!$this->hasDirectPermission($permission)) {
-            $this->permissions()->save($permission);
+            $this->permissions()->attach($permission->id, ['model_type' => static::class]);
         }
 
         return $this;
@@ -208,11 +222,21 @@ trait HasRoles
      */
     public function syncPermissions($permissions): self
     {
-        $permissions = collect($permissions)->map(function ($permission) {
+        $permissionIds = collect($permissions)->map(function ($permission) {
+            // Si es un ID numérico, usarlo directamente
+            if (is_numeric($permission)) {
+                return (int) $permission;
+            }
+            // Si es un string o Permission, buscar/obtener el ID
             return $this->getStoredPermission($permission)->id;
-        });
+        })->filter()->values()->toArray();
 
-        $this->permissions()->sync($permissions);
+        $syncData = [];
+        foreach ($permissionIds as $permissionId) {
+            $syncData[$permissionId] = ['model_type' => static::class];
+        }
+
+        $this->permissions()->sync($syncData);
 
         return $this;
     }
@@ -289,35 +313,57 @@ trait HasRoles
     }
 
     /**
-     * Get stored role from string or Role model.
+     * Get stored role from string, ID, or Role model.
      */
     protected function getStoredRole($role): Role
     {
-        if (is_string($role)) {
-            return Role::findByName($role, $this->getDefaultGuardName());
-        }
-
+        // Si es una instancia de Role, retornarla directamente
         if ($role instanceof Role) {
             return $role;
         }
 
-        throw new \InvalidArgumentException('Role must be a string or Role instance');
+        // Si es un ID numérico, buscar por ID
+        if (is_numeric($role)) {
+            $foundRole = Role::find((int) $role);
+            if (!$foundRole) {
+                throw new \InvalidArgumentException("Role with ID {$role} not found");
+            }
+            return $foundRole;
+        }
+
+        // Si es un string, buscar por nombre
+        if (is_string($role)) {
+            return Role::findByName($role, $this->getDefaultGuardName());
+        }
+
+        throw new \InvalidArgumentException('Role must be a string, numeric ID, or Role instance');
     }
 
     /**
-     * Get stored permission from string or Permission model.
+     * Get stored permission from string, ID, or Permission model.
      */
     protected function getStoredPermission($permission): Permission
     {
-        if (is_string($permission)) {
-            return Permission::findByName($permission, $this->getDefaultGuardName());
-        }
-
+        // Si es una instancia de Permission, retornarla directamente
         if ($permission instanceof Permission) {
             return $permission;
         }
 
-        throw new \InvalidArgumentException('Permission must be a string or Permission instance');
+        // Si es un ID numérico, buscar por ID
+        if (is_numeric($permission)) {
+            $foundPermission = Permission::find((int) $permission);
+            if (!$foundPermission) {
+                throw new \InvalidArgumentException("Permission with ID {$permission} not found");
+            }
+            return $foundPermission;
+        }
+
+        // Si es un string, buscar por nombre
+        if (is_string($permission)) {
+            return Permission::findByName($permission, $this->getDefaultGuardName());
+        }
+
+        throw new \InvalidArgumentException('Permission must be a string, numeric ID, or Permission instance');
     }
 
     /**

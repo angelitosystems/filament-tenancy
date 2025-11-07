@@ -2,17 +2,13 @@
 
 namespace AngelitoSystems\FilamentTenancy;
 
-use AngelitoSystems\FilamentTenancy\Commands\TestLanguageSwitchingCommand;
-use AngelitoSystems\FilamentTenancy\Commands\ClearLanguageSessionCommand;
 use AngelitoSystems\FilamentTenancy\Commands\DebugConfigCommand;
-use AngelitoSystems\FilamentTenancy\Commands\TestManualSwitchCommand;
 use AngelitoSystems\FilamentTenancy\Commands\CreateCentralAdminCommand;
 use AngelitoSystems\FilamentTenancy\Commands\CreateTenantCommand;
 use AngelitoSystems\FilamentTenancy\Commands\CreateTenantUserCommand;
 use AngelitoSystems\FilamentTenancy\Commands\AssignRoleToTenantUserCommand;
-use AngelitoSystems\FilamentTenancy\Commands\DebugLanguageRoutesCommand;
 use AngelitoSystems\FilamentTenancy\Commands\DeleteTenantCommand;
-use AngelitoSystems\FilamentTenancy\Commands\DiagnoseLanguageCommand;
+use AngelitoSystems\FilamentTenancy\Commands\DeactivateExpiredTenantsCommand;
 use AngelitoSystems\FilamentTenancy\Commands\InstallCommand;
 use AngelitoSystems\FilamentTenancy\Commands\ListTenantsCommand;
 use AngelitoSystems\FilamentTenancy\Commands\MigrateTenantCommand;
@@ -24,15 +20,15 @@ use AngelitoSystems\FilamentTenancy\Commands\SetupCentralDatabaseCommand;
 use AngelitoSystems\FilamentTenancy\Commands\TenantFreshCommand;
 use AngelitoSystems\FilamentTenancy\Commands\TenantMigrateCommand;
 use AngelitoSystems\FilamentTenancy\Commands\TenantRollbackCommand;
-use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
-use AngelitoSystems\FilamentTenancy\Facades\TenancyPermissions;
 use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyLandlordPlugin;
 use AngelitoSystems\FilamentTenancy\FilamentPlugins\TenancyTenantPlugin;
+use AngelitoSystems\FilamentTenancy\Middleware\CheckPendingSubscription;
 use AngelitoSystems\FilamentTenancy\Middleware\CheckPermission;
 use AngelitoSystems\FilamentTenancy\Middleware\CheckRole;
 use AngelitoSystems\FilamentTenancy\Middleware\EnsureTenantAccess;
 use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventAccessFromCentralDomains;
+use AngelitoSystems\FilamentTenancy\Middleware\RestrictSubscriptionFeatures;
 use AngelitoSystems\FilamentTenancy\Middleware\SetLocale;
 use AngelitoSystems\FilamentTenancy\Middleware\TenancyPerformanceMonitor;
 use AngelitoSystems\FilamentTenancy\Middleware\TenantSessionMiddleware;
@@ -46,12 +42,10 @@ use AngelitoSystems\FilamentTenancy\Support\CredentialManager;
 use AngelitoSystems\FilamentTenancy\Support\TenancyLogger;
 use AngelitoSystems\FilamentTenancy\Support\DomainResolver;
 use AngelitoSystems\FilamentTenancy\Support\TenantUrlGenerator;
+use AngelitoSystems\FilamentTenancy\Support\PayPalService;
 use AngelitoSystems\FilamentTenancy\Support\Contracts\ConnectionManagerInterface;
 use AngelitoSystems\FilamentTenancy\Support\Contracts\CredentialManagerInterface;
 use Filament\Panel;
-use Illuminate\Contracts\Http\Kernel;
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class TenancyServiceProvider extends ServiceProvider
@@ -61,6 +55,12 @@ class TenancyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Register DomPDF service provider if available
+        // Check if DomPDF is installed (either in package or main project)
+        if (class_exists(\Barryvdh\DomPDF\ServiceProvider::class)) {
+            $this->app->register(\Barryvdh\DomPDF\ServiceProvider::class);
+        }
+
         // Merge configuration
         $this->mergeConfigFrom(
             __DIR__ . '/../config/filament-tenancy.php',
@@ -82,9 +82,6 @@ class TenancyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Set locale early from session/cookie if available
-        // This runs before Laravel uses the default locale from .env
-        $this->setLocaleEarly();
 
         // Register routes first to ensure they're available for plugins
         $this->registerRoutes();
@@ -118,7 +115,9 @@ class TenancyServiceProvider extends ServiceProvider
         // Load views
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'filament-tenancy');
 
-        // Load language files
+        // Register translations namespace
+        // Esto asegura que Laravel pueda encontrar 'filament-tenancy::tenancy.{key}'
+        // Las traducciones se cargan desde ./lang/ del paquete
         $this->loadTranslationsFrom(__DIR__ . '/../lang', 'filament-tenancy');
 
         // Publish views (404 page)
@@ -127,21 +126,23 @@ class TenancyServiceProvider extends ServiceProvider
         ], 'filament-tenancy-views');
 
         // Publish language files
+        // Permite que el usuario pueda personalizar las traducciones del paquete
         $this->publishes([
-            __DIR__ . '/../lang' => resource_path('lang/vendor/filament-tenancy'),
+            __DIR__ . '/../lang' => $this->app->langPath('vendor/filament-tenancy'),
         ], 'filament-tenancy-lang');
 
         // Publish simple language files for __('tenancy.key') usage
+        // Traducciones simples para uso directo sin namespace
         $this->publishes([
-            __DIR__ . '/../lang/es/simple.php' => resource_path('lang/es/tenancy.php'),
-            __DIR__ . '/../lang/en/simple.php' => resource_path('lang/en/tenancy.php'),
+            __DIR__ . '/../lang/es/tenancy.php' => $this->app->langPath('es/tenancy.php'),
+            __DIR__ . '/../lang/en/tenancy.php' => $this->app->langPath('en/tenancy.php'),
         ], 'filament-tenancy-simple-lang');
 
         // Publish Filament translations
         $this->publishes([
-            __DIR__ . '/../lang/es/filament-actions.php' => resource_path('lang/es/filament-actions.php'),
-            __DIR__ . '/../lang/es/filament-panels.php' => resource_path('lang/es/filament-panels.php'),
-            __DIR__ . '/../lang/es/filament-tables.php' => resource_path('lang/es/filament-tables.php'),
+            __DIR__ . '/../lang/es/filament-actions.php' => $this->app->langPath('es/filament-actions.php'),
+            __DIR__ . '/../lang/es/filament-panels.php' => $this->app->langPath('es/filament-panels.php'),
+            __DIR__ . '/../lang/es/filament-tables.php' => $this->app->langPath('es/filament-tables.php'),
         ], 'filament-tenancy-filament-lang');
 
         // Publish routes
@@ -168,9 +169,6 @@ class TenancyServiceProvider extends ServiceProvider
 
         // Register event listeners
         $this->registerEventListeners();
-
-        // Register locale early setup listener
-        $this->registerLocaleEarlySetup();
 
         // Register asset manager helper
         AssetManager::registerAssetHelper();
@@ -241,6 +239,11 @@ class TenancyServiceProvider extends ServiceProvider
             return new PermissionManager();
         });
 
+        // Register PayPalService
+        $this->app->singleton(PayPalService::class, function ($app) {
+            return new PayPalService();
+        });
+
         // Register current tenant instance
         $this->app->instance('current-tenant', null);
     }
@@ -266,12 +269,7 @@ class TenancyServiceProvider extends ServiceProvider
                 InstallCommand::class,
                 PublishAssetsCommand::class,
                 TestTranslationsCommand::class,
-                DiagnoseLanguageCommand::class,
-                DebugLanguageRoutesCommand::class,
-                TestLanguageSwitchingCommand::class,
-                ClearLanguageSessionCommand::class,
                 DebugConfigCommand::class,
-                TestManualSwitchCommand::class,
                 SetupCentralDatabaseCommand::class,
                 CreateCentralAdminCommand::class,
                 SeedCentralDatabaseCommand::class,
@@ -285,6 +283,7 @@ class TenancyServiceProvider extends ServiceProvider
                 ListTenantsCommand::class,
                 DeleteTenantCommand::class,
                 MonitorConnectionsCommand::class,
+                DeactivateExpiredTenantsCommand::class,
             ]);
         }
     }
@@ -299,6 +298,8 @@ class TenancyServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenancy.initialize', InitializeTenancy::class);
         $router->aliasMiddleware('tenancy.prevent-central-access', PreventAccessFromCentralDomains::class);
         $router->aliasMiddleware('tenancy.ensure-tenant-access', EnsureTenantAccess::class);
+        $router->aliasMiddleware('tenancy.check-pending-subscription', CheckPendingSubscription::class);
+        $router->aliasMiddleware('tenancy.restrict-subscription-features', RestrictSubscriptionFeatures::class);
         $router->aliasMiddleware('tenancy.performance-monitor', TenancyPerformanceMonitor::class);
         $router->aliasMiddleware('tenancy.session', TenantSessionMiddleware::class);
         $router->aliasMiddleware('permission', CheckPermission::class);
@@ -349,6 +350,12 @@ class TenancyServiceProvider extends ServiceProvider
             \AngelitoSystems\FilamentTenancy\Events\TenantCreated::class,
             \AngelitoSystems\FilamentTenancy\Listeners\RunTenantMigrationsOnTenantCreated::class
         );
+
+        // Register subscription status change event
+        $this->app['events']->listen(
+            \AngelitoSystems\FilamentTenancy\Events\SubscriptionStatusChanged::class,
+            \AngelitoSystems\FilamentTenancy\Listeners\UpdateTenantStatusOnSubscriptionChange::class
+        );
     }
 
     /**
@@ -371,111 +378,21 @@ class TenancyServiceProvider extends ServiceProvider
      */
     protected function registerRoutes(): void
     {
-        // Register routes immediately with the router
-        Route::middleware('web')
-            ->prefix('language')
-            ->group(function () {
-                Route::get('{locale}', function (string $locale) {
-                    if (in_array($locale, array_keys(\AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::getAvailableLocales()))) {
-                        \AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::setLocale($locale);
-                    }
-                    return redirect()->back();
-                })->name('language.switch');
-            });
-
         // Also load from file if it exists
         if (file_exists(__DIR__ . '/../routes/tenant.php')) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/tenant.php');
         }
-        
+
         // Load additional web routes for Laravel 12 compatibility
         if (file_exists(__DIR__ . '/../routes/web.php')) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         }
-        
+
         // Load enhanced language switching routes
         if (file_exists(__DIR__ . '/../routes/enhanced-language.php')) {
             $this->loadRoutesFrom(__DIR__ . '/../routes/enhanced-language.php');
         }
     }
-
-    /**
-     * Set locale early from session/cookie before Laravel uses .env default.
-     * This ensures user's locale preference is respected even before middleware runs.
-     */
-    protected function setLocaleEarly(): void
-    {
-        // Try to set locale if request is available during boot
-        // This is a fallback, the main logic is in registerLocaleEarlySetup()
-        if (!$this->app->runningInConsole() && $this->app->bound('request')) {
-            try {
-                $request = $this->app->make('request');
-                $this->applyLocaleFromRequest($request);
-            } catch (\Exception $e) {
-                // Silently fail - listener will handle it
-            }
-        }
-    }
-
-    /**
-     * Register listener to set locale early when request is available.
-     */
-    protected function registerLocaleEarlySetup(): void
-    {
-        // Listen for route matched event to set locale early
-        // This runs before most middleware but after request is available
-        Event::listen(\Illuminate\Routing\Events\RouteMatched::class, function ($event) {
-            if (!$this->app->runningInConsole() && $event->request) {
-                $this->applyLocaleFromRequest($event->request);
-            }
-        });
-
-        // Also listen for any HTTP request if route matching hasn't fired yet
-        // This is a backup in case route matching event doesn't fire
-        if (!$this->app->runningInConsole() && $this->app->bound('request')) {
-            try {
-                $request = $this->app->make('request');
-                $this->applyLocaleFromRequest($request);
-            } catch (\Exception $e) {
-                // Silently fail - middleware will handle it
-            }
-        }
-    }
-
-    /**
-     * Apply locale from request (cookie or session).
-     * Simplified: Only uses APP_LOCALE from .env for now.
-     */
-    protected function applyLocaleFromRequest($request): void
-    {
-        try {
-            // Check if localization is enabled
-            if (!config('filament-tenancy.localization.enabled', true)) {
-                return;
-            }
-
-            // Simplified: Only use APP_LOCALE from .env
-            $locale = config('app.locale', 'en');
-            $availableLocales = array_keys(\AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher::getAvailableLocales());
-            
-            // Ensure the locale is valid
-            if (!in_array($locale, $availableLocales)) {
-                $locale = 'en';
-            }
-
-            // Set the locale
-            if (\Illuminate\Support\Facades\App::getLocale() !== $locale) {
-                \Illuminate\Support\Facades\App::setLocale($locale);
-            }
-        } catch (\Exception $e) {
-            // Silently fail if we can't set locale early
-            // The middleware will handle it later
-            \Illuminate\Support\Facades\Log::debug('TenancyServiceProvider: Could not set locale early', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
     /**
      * Get the services provided by the provider.
      */

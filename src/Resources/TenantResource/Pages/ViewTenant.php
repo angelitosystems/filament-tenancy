@@ -22,33 +22,33 @@ class ViewTenant extends ViewRecord
         return [
             Actions\EditAction::make(),
             Actions\Action::make('visit_tenant')
-                ->label('Visit Tenant')
+                ->label(__('tenant.visit_tenant'))
                 ->icon('heroicon-o-arrow-top-right-on-square')
                 ->url(fn() => $this->record->getUrl())
                 ->openUrlInNewTab()
                 ->visible(fn() => $this->record->isActive()),
             Actions\Action::make('run_migrations')
-                ->label('Run Migrations')
+                ->label(__('tenant.run_migrations'))
                 ->icon('heroicon-o-cog-6-tooth')
                 ->action(function () {
                     try {
                         Tenancy::database()->runTenantMigrations($this->record);
 
                         \Filament\Notifications\Notification::make()
-                            ->title('Migrations completed')
-                            ->body('Tenant migrations have been run successfully.')
+                            ->title(__('tenant.migrations_completed'))
+                            ->body(__('tenant.migrations_completed_message'))
                             ->success()
                             ->send();
                     } catch (\Exception $e) {
                         \Filament\Notifications\Notification::make()
-                            ->title('Migration failed')
-                            ->body($e->getMessage())
+                            ->title(__('tenant.migration_failed'))
+                            ->body(str_replace(':message', $e->getMessage(), __('tenant.error')))
                             ->danger()
                             ->send();
                     }
                 })
                 ->requiresConfirmation()
-                ->modalDescription('This will run all pending migrations for this tenant.'),
+                ->modalDescription(__('tenant.run_migrations_description')),
         ];
     }
 
@@ -57,16 +57,19 @@ class ViewTenant extends ViewRecord
         return $schema
             ->columns(2)
             ->components([
-                Section::make('Basic Information')
+                Section::make(__('tenant.basic_information'))
                     ->schema([
                         TextEntry::make('id')
-                            ->label('ID'),
-                        TextEntry::make('name'),
-                        TextEntry::make('slug'),
+                            ->label(__('tenant.id')),
+                        TextEntry::make('name')
+                            ->label(__('tenancy.name')),
+                        TextEntry::make('slug')
+                            ->label(__('tenancy.slug')),
                         IconEntry::make('is_active')
-                            ->label('Active')
+                            ->label(__('tenant.active'))
                             ->boolean(),
                         TextEntry::make('plan')
+                            ->label(__('tenancy.plan'))
                             ->badge()
                             ->color(fn(string $state): string => match ($state) {
                                 'basic' => 'gray',
@@ -74,25 +77,25 @@ class ViewTenant extends ViewRecord
                                 'enterprise' => 'success',
                                 default => 'gray',
                             })
-                            ->placeholder('No plan'),
+                            ->placeholder(__('tenancy.no_plan')),
                         TextEntry::make('expires_at')
-                            ->label('Expires')
+                            ->label(__('tenant.expires'))
                             ->date()
-                            ->placeholder('Never'),
+                            ->placeholder(__('tenancy.never')),
                     ])
                     ->columns(2)
                     ->columnSpanFull(),
 
-                Section::make('Domain Configuration')
+                Section::make(__('tenant.domain_configuration'))
                     ->schema([
                         TextEntry::make('domain')
-                            ->label('Custom Domain')
-                            ->placeholder('Not set'),
+                            ->label(__('tenant.custom_domain'))
+                            ->placeholder(__('tenant.not_set')),
                         TextEntry::make('subdomain')
-                            ->label('Subdomain')
-                            ->placeholder('Not set'),
+                            ->label(__('tenancy.subdomain'))
+                            ->placeholder(__('tenant.not_set')),
                         TextEntry::make('full_domain')
-                            ->label('Full URL')
+                            ->label(__('tenant.full_url'))
                             ->state(fn() => $this->record->getUrl())
                             ->url(fn() => $this->record->getUrl())
                             ->openUrlInNewTab(),
@@ -100,27 +103,27 @@ class ViewTenant extends ViewRecord
                     ->columns(2)
                     ->columnSpanFull(),
 
-                Section::make('Timestamps')
+                Section::make(__('tenant.timestamps'))
                     ->schema([
                         TextEntry::make('created_at')
-                            ->label('Created')
+                            ->label(__('tenant.created'))
                             ->dateTime(),
                         TextEntry::make('updated_at')
-                            ->label('Updated')
+                            ->label(__('tenant.updated'))
                             ->dateTime(),
                         TextEntry::make('deleted_at')
-                            ->label('Deleted')
+                            ->label(__('tenant.deleted'))
                             ->dateTime()
-                            ->placeholder('Not deleted'),
+                            ->placeholder(__('tenant.not_deleted')),
                     ])
                     ->columns(3)
                     ->columnSpanFull(),
 
-                Section::make('Additional Data')
+                Section::make(__('tenant.additional_data'))
                     ->schema([
                         KeyValueEntry::make('data')
-                            ->label('Custom Data')
-                            ->placeholder('No additional data'),
+                            ->label(__('tenant.custom_data'))
+                            ->placeholder(__('tenant.no_additional_data')),
                     ])
                     ->visible(fn() => !empty($this->record->data))
                     ->columnSpanFull(),

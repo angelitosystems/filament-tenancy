@@ -22,3 +22,16 @@ Route::get('/language/{locale}', function (string $locale) {
     }
     return redirect()->back();
 })->name('language.switch');
+
+// PayPal routes
+Route::post('/paypal/webhook', [\AngelitoSystems\FilamentTenancy\Http\Controllers\PayPalController::class, 'webhook'])
+    ->name('paypal.webhook')
+    ->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class]);
+
+Route::get('/paypal/success', [\AngelitoSystems\FilamentTenancy\Http\Controllers\PayPalController::class, 'success'])
+    ->name('paypal.success')
+    ->middleware('web');
+
+Route::get('/paypal/cancel', [\AngelitoSystems\FilamentTenancy\Http\Controllers\PayPalController::class, 'cancel'])
+    ->name('paypal.cancel')
+    ->middleware('web');

@@ -21,27 +21,27 @@ class CreateTenant extends CreateRecord
             $details = [];
             
             if (config('filament-tenancy.database.auto_create', true)) {
-                $details[] = "✅ Database '{$tenant->database_name}' created";
+                $details[] = str_replace(':name', $tenant->database_name, __('tenant.database_created'));
             }
             
             if (config('filament-tenancy.migrations.auto_run', true)) {
-                $details[] = "✅ Migrations executed";
+                $details[] = __('tenant.migrations_executed');
             }
             
             if (config('filament-tenancy.seeders.auto_run', true)) {
                 $seederCount = count(config('filament-tenancy.seeders.classes', []));
                 if ($seederCount > 0) {
-                    $details[] = "✅ {$seederCount} seeders executed";
+                    $details[] = str_replace(':count', $seederCount, __('tenant.seeders_executed'));
                 }
             }
 
-            $bodyMessage = "Tenant '{$tenant->name}' has been created successfully.";
+            $bodyMessage = str_replace(':name', $tenant->name, __('tenant.tenant_created_message'));
             if (!empty($details)) {
                 $bodyMessage .= "\n\n" . implode("\n", $details);
             }
 
             Notification::make()
-                ->title('🎉 Tenant created successfully!')
+                ->title(__('tenant.tenant_created_successfully'))
                 ->body($bodyMessage)
                 ->success()
                 ->duration(8000) // Show longer to read details
@@ -50,8 +50,8 @@ class CreateTenant extends CreateRecord
             return $tenant;
         } catch (\Exception $e) {
             Notification::make()
-                ->title('❌ Failed to create tenant')
-                ->body("Error: {$e->getMessage()}")
+                ->title(__('tenant.failed_to_create_tenant'))
+                ->body(str_replace(':message', $e->getMessage(), __('tenant.error')))
                 ->danger()
                 ->duration(10000)
                 ->send();

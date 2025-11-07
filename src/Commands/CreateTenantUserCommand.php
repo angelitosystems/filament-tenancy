@@ -401,8 +401,9 @@ class CreateTenantUserCommand extends Command
                         $user->assignRole($role);
                         $this->info("  ✓ Rol '{$role->name}' asignado correctamente.");
                     } elseif (method_exists($user, 'roles')) {
-                        // Fallback: use the relationship directly
-                        $user->roles()->attach($role->id);
+                        // Fallback: use the relationship directly with model_type
+                        $userModelClass = get_class($user);
+                        $user->roles()->attach($role->id, ['model_type' => $userModelClass]);
                         $this->info("  ✓ Rol '{$role->name}' asignado correctamente (usando relación directa).");
                     } else {
                         // Fallback: insert directly into pivot table

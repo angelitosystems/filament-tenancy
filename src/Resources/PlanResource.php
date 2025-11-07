@@ -3,6 +3,7 @@
 namespace AngelitoSystems\FilamentTenancy\Resources;
 
 use AngelitoSystems\FilamentTenancy\Models\Plan;
+use AngelitoSystems\FilamentTenancy\Traits\HasResourceAuthorization;
 use AngelitoSystems\FilamentTenancy\Traits\HasSimpleTranslations;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -27,6 +28,7 @@ use Filament\Tables\Table;
 class PlanResource extends Resource
 {
     use HasSimpleTranslations;
+    use HasResourceAuthorization;
 
     protected static ?string $model = Plan::class;
 
@@ -37,13 +39,16 @@ class PlanResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     /**
-     * Override translation keys
+     * Override translation prefix to use 'plans' namespace
      */
-    public static function getNavigationKey(): string
+    protected static function getTranslationPrefix(): ?string
     {
         return 'plans';
     }
 
+    /**
+     * Override translation keys
+     */
     public static function getModelKey(): string
     {
         return 'plan';
@@ -59,19 +64,70 @@ class PlanResource extends Resource
         return 'plans';
     }
 
+    /**
+     * Define el key del navigation group
+     */
     public static function getNavigationGroupKey(): ?string
     {
         return 'billing_management';
+    }
+
+    protected static function getNavigationGroupLabel(): ?string
+    {
+        return 'billing_management';
+    }
+
+    /**
+     * Define permisos y roles para autorización
+     */
+    protected static function getAccessPermissions(): array
+    {
+        return ['manage plans', 'view plans'];
+    }
+
+    protected static function getAccessRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getCreatePermissions(): array
+    {
+        return ['create plans', 'manage plans'];
+    }
+
+    protected static function getCreateRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getEditPermissions(): array
+    {
+        return ['edit plans', 'manage plans'];
+    }
+
+    protected static function getEditRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getDeletePermissions(): array
+    {
+        return ['delete plans', 'manage plans'];
+    }
+
+    protected static function getDeleteRoles(): array
+    {
+        return ['admin'];
     }
 
     public static function form(Schema $form): Schema
     {
         return $form
             ->schema([
-                Section::make(__('tenancy.plan_information'))
+                Section::make(static::__('section_plan_information'))
                     ->schema([
                         TextInput::make('name')
-                            ->label(__('tenancy.name'))
+                            ->label(static::__('name'))
                             ->required()
                             ->maxLength(255)
                             ->live(onBlur: true)
@@ -80,95 +136,99 @@ class PlanResource extends Resource
                             }),
 
                         TextInput::make('slug')
-                            ->label(__('tenancy.slug'))
+                            ->label(static::__('slug'))
                             ->required()
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->readonly(),
 
                         Textarea::make('description')
-                            ->label(__('tenancy.description'))
+                            ->label(static::__('description'))
                             ->rows(3)
-                            ->placeholder(__('tenancy.describe_plan')),
+                            ->placeholder(static::__('describe_plan')),
 
                         ColorPicker::make('color')
-                            ->label(__('tenancy.color'))
-                            ->helperText(__('tenancy.color_helper')),
+                            ->label(static::__('color'))
+                            ->helperText(static::__('color_helper')),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Section::make(__('tenancy.pricing'))
+                Section::make(static::__('section_pricing'))
                     ->schema([
                         TextInput::make('price')
-                            ->label(__('tenancy.price'))
+                            ->label(static::__('price'))
                             ->numeric()
                             ->prefix('$')
                             ->step(0.01)
                             ->required(),
 
                         Select::make('billing_cycle')
-                            ->label(__('tenancy.billing_cycle'))
+                            ->label(static::__('billing_cycle'))
                             ->options([
-                                'monthly' => __('tenancy.monthly'),
-                                'yearly' => __('tenancy.yearly'),
-                                'quarterly' => __('tenancy.quarterly'),
-                                'lifetime' => __('tenancy.lifetime'),
+                                'monthly' => static::__('monthly'),
+                                'yearly' => static::__('yearly'),
+                                'quarterly' => static::__('quarterly'),
+                                'lifetime' => static::__('lifetime'),
                             ])
                             ->required()
                             ->default('monthly'),
 
                         TextInput::make('trial_days')
-                            ->label(__('tenancy.trial_days'))
+                            ->label(static::__('trial_days'))
                             ->numeric()
                             ->default(0)
-                            ->helperText(__('tenancy.trial_days_helper')),
+                            ->helperText(static::__('trial_days_helper')),
 
                         Toggle::make('is_active')
-                            ->label(__('tenancy.is_active'))
+                            ->label(static::__('is_active'))
                             ->default(true)
-                            ->helperText(__('tenancy.active_helper')),
+                            ->helperText(static::__('active_helper')),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Section::make(__('tenancy.features_limits'))
+                Section::make(static::__('section_features_limits'))
                     ->schema([
                         KeyValue::make('features')
-                            ->label(__('tenancy.features'))
-                            ->keyLabel(__('tenancy.feature_name'))
-                            ->valueLabel(__('tenancy.feature_description'))
-                            ->addActionLabel(__('tenancy.add_feature'))
+                            ->label(static::__('features'))
+                            ->keyLabel(static::__('feature_name'))
+                            ->valueLabel(static::__('feature_description'))
+                            ->addActionLabel(static::__('add_feature'))
                             ->reorderable()
                             ->deleteAction(fn(Action $action) => $action->requiresConfirmation()),
 
                         KeyValue::make('limits')
-                            ->label(__('tenancy.limits'))
-                            ->keyLabel(__('tenancy.limit_name'))
-                            ->valueLabel(__('tenancy.limit_value'))
-                            ->addActionLabel(__('tenancy.add_limit'))
+                            ->label(static::__('limits'))
+                            ->keyLabel(static::__('limit_name'))
+                            ->valueLabel(static::__('limit_value'))
+                            ->addActionLabel(static::__('add_limit'))
                             ->reorderable()
                             ->deleteAction(fn(Action $action) => $action->requiresConfirmation()),
                     ])
-                    ->columns(2),
+                    ->columns(2)
+                    ->columnSpanFull(),
 
-                Section::make(__('tenancy.display_settings'))
+                Section::make(static::__('section_display_settings'))
                     ->schema([
                         TextInput::make('sort_order')
-                            ->label(__('tenancy.sort_order'))
+                            ->label(static::__('sort_order'))
                             ->numeric()
                             ->default(0)
-                            ->helperText(__('tenancy.sort_order_helper')),
+                            ->helperText(static::__('sort_order_helper')),
 
                         Toggle::make('is_popular')
-                            ->label(__('tenancy.is_popular'))
+                            ->label(static::__('is_popular'))
                             ->default(false)
-                            ->helperText(__('tenancy.popular_helper')),
+                            ->helperText(static::__('popular_helper')),
 
                         Toggle::make('is_featured')
-                            ->label(__('tenancy.is_featured'))
+                            ->label(static::__('is_featured'))
                             ->default(false)
-                            ->helperText(__('tenancy.featured_helper')),
+                            ->helperText(static::__('featured_helper')),
                     ])
-                    ->columns(3),
+                    ->columns(3)
+                    ->columnSpanFull(),
             ]);
     }
 
@@ -177,24 +237,25 @@ class PlanResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->label(__('tenancy.name'))
+                    ->label(static::__('name'))
                     ->searchable()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('slug')
-                    ->label(__('tenancy.slug'))
+                    ->label(static::__('slug'))
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('price')
-                    ->label(__('tenancy.price'))
+                    ->label(static::__('price'))
                     ->money('USD')
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('billing_cycle')
-                    ->label(__('tenancy.billing_cycle'))
+                    ->label(static::__('billing_cycle'))
                     ->badge()
+                    ->formatStateUsing(fn($state) => static::__($state))
                     ->colors([
                         'monthly' => 'blue',
                         'yearly' => 'green',
@@ -203,66 +264,68 @@ class PlanResource extends Resource
                     ]),
 
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label(__('tenancy.is_active'))
+                    ->label(static::__('is_active'))
                     ->boolean()
                     ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_popular')
-                    ->label(__('tenancy.is_popular'))
+                    ->label(static::__('is_popular'))
                     ->boolean()
                     ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_featured')
-                    ->label(__('tenancy.is_featured'))
+                    ->label(static::__('is_featured'))
                     ->boolean()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('sort_order')
-                    ->label(__('tenancy.sort_order'))
+                    ->label(static::__('sort_order'))
                     ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('created_at')
+                    ->label(static::__('created_at'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('billing_cycle')
+                    ->label(static::__('billing_cycle'))
                     ->options([
-                        'monthly' => __('tenancy.monthly'),
-                        'yearly' => __('tenancy.yearly'),
-                        'quarterly' => __('tenancy.quarterly'),
-                        'lifetime' => __('tenancy.lifetime'),
+                        'monthly' => static::__('monthly'),
+                        'yearly' => static::__('yearly'),
+                        'quarterly' => static::__('quarterly'),
+                        'lifetime' => static::__('lifetime'),
                     ]),
 
                 Tables\Filters\TernaryFilter::make('is_active')
-                    ->label(__('tenancy.is_active'))
-                    ->placeholder(__('tenancy.all_plans'))
-                    ->trueLabel(__('tenancy.active_plans'))
-                    ->falseLabel(__('tenancy.inactive_plans')),
+                    ->label(static::__('is_active'))
+                    ->placeholder(static::__('all_plans'))
+                    ->trueLabel(static::__('active_plans'))
+                    ->falseLabel(static::__('inactive_plans')),
 
                 Tables\Filters\TernaryFilter::make('is_popular')
-                    ->label(__('tenancy.is_popular'))
-                    ->placeholder(__('tenancy.all_plans'))
-                    ->trueLabel(__('tenancy.popular_plans'))
-                    ->falseLabel(__('tenancy.regular_plans')),
+                    ->label(static::__('is_popular'))
+                    ->placeholder(static::__('all_plans'))
+                    ->trueLabel(static::__('popular_plans'))
+                    ->falseLabel(static::__('regular_plans')),
 
                 Tables\Filters\TernaryFilter::make('is_featured')
-                    ->label(__('tenancy.is_featured'))
-                    ->placeholder(__('tenancy.all_plans'))
-                    ->trueLabel(__('tenancy.featured_plans'))
-                    ->falseLabel(__('tenancy.regular_plans')),
+                    ->label(static::__('is_featured'))
+                    ->placeholder(static::__('all_plans'))
+                    ->trueLabel(static::__('featured_plans'))
+                    ->falseLabel(static::__('regular_plans')),
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make()
-                    ->label(__('tenancy.view')),
+                    ->label(static::__('view')),
                 EditAction::make()
-                    ->label(__('tenancy.edit')),
+                    ->label(static::__('edit')),
                 DeleteAction::make()
-                    ->label(__('tenancy.delete')),
+                    ->label(static::__('delete')),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),

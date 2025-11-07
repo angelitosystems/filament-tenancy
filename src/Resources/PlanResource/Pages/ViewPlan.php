@@ -4,7 +4,12 @@ namespace AngelitoSystems\FilamentTenancy\Resources\PlanResource\Pages;
 
 use AngelitoSystems\FilamentTenancy\Resources\PlanResource;
 use Filament\Actions;
+use Filament\Infolists\Components\ColorEntry;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Tables\Columns\TextColumn;
 
 class ViewPlan extends ViewRecord
 {
@@ -20,40 +25,41 @@ class ViewPlan extends ViewRecord
     protected function getInfolistSchema(): array
     {
         return [
-            \Filament\Infolists\Components\Section::make('Plan Information')
+            Section::make('Plan Information')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('name'),
-                    \Filament\Infolists\Components\TextEntry::make('slug'),
-                    \Filament\Infolists\Components\TextEntry::make('description'),
-                    \Filament\Infolists\Components\ColorEntry::make('color'),
+                    TextEntry::make('name'),
+                    TextEntry::make('slug'),
+                    TextEntry::make('description'),
+                    ColorEntry::make('color'),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Pricing')
+            Section::make('Pricing')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('price')
+                    TextEntry::make('price')
                         ->money('USD'),
-                    \Filament\Infolists\Components\BadgeEntry::make('billing_cycle'),
-                    \Filament\Infolists\Components\TextEntry::make('trial_days')
+                    TextColumn::make('billing_cycle')
+                        ->badge(),
+                    TextEntry::make('trial_days')
                         ->suffix(' days'),
-                    \Filament\Infolists\Components\IconEntry::make('is_active')
+                    IconEntry::make('is_active')
                         ->boolean(),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Features')
+            Section::make('Features')
                 ->schema([
                     \Filament\Infolists\Components\KeyValueEntry::make('features')
                         ->columnSpanFull(),
                 ]),
 
-            \Filament\Infolists\Components\Section::make('Limits')
+            Section::make('Limits')
                 ->schema([
                     \Filament\Infolists\Components\KeyValueEntry::make('limits')
                         ->columnSpanFull(),
                 ]),
 
-            \Filament\Infolists\Components\Section::make('Display Settings')
+            Section::make('Display Settings')
                 ->schema([
                     \Filament\Infolists\Components\TextEntry::make('sort_order'),
                     \Filament\Infolists\Components\IconEntry::make('is_popular')
@@ -65,11 +71,11 @@ class ViewPlan extends ViewRecord
                 ])
                 ->columns(3),
 
-            \Filament\Infolists\Components\Section::make('Timestamps')
+            Section::make('Timestamps')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('created_at')
+                    TextEntry::make('created_at')
                         ->dateTime(),
-                    \Filament\Infolists\Components\TextEntry::make('updated_at')
+                    TextEntry::make('updated_at')
                         ->dateTime(),
                 ])
                 ->columns(2),

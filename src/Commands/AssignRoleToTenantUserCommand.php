@@ -327,7 +327,12 @@ class AssignRoleToTenantUserCommand extends Command
                     $user->syncRoles($roles);
                     $this->info("  ✓ Roles sincronizados (reemplazados todos los roles existentes).");
                 } elseif (method_exists($user, 'roles')) {
-                    $user->roles()->sync(collect($roles)->pluck('id')->toArray());
+                    $userModelClass = get_class($user);
+                    $syncData = [];
+                    foreach ($roles as $role) {
+                        $syncData[$role->id] = ['model_type' => $userModelClass];
+                    }
+                    $user->roles()->sync($syncData);
                     $this->info("  ✓ Roles sincronizados (reemplazados todos los roles existentes).");
                 } else {
                     // Fallback: delete all and insert new ones
@@ -354,7 +359,8 @@ class AssignRoleToTenantUserCommand extends Command
                         $this->info("  ✓ Rol '{$role->name}' asignado correctamente.");
                     } elseif (method_exists($user, 'roles')) {
                         if (!$user->roles()->where('role_id', $role->id)->exists()) {
-                            $user->roles()->attach($role->id);
+                            $userModelClass = get_class($user);
+                            $user->roles()->attach($role->id, ['model_type' => $userModelClass]);
                             $this->info("  ✓ Rol '{$role->name}' asignado correctamente (usando relación directa).");
                         } else {
                             $this->warn("  ⚠ El usuario ya tiene el rol '{$role->name}'.");

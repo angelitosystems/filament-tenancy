@@ -4,7 +4,12 @@ namespace AngelitoSystems\FilamentTenancy\Resources\PermissionResource\Pages;
 
 use AngelitoSystems\FilamentTenancy\Resources\PermissionResource;
 use Filament\Actions;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\TextColumn;
 
 class ViewPermission extends ViewRecord
 {
@@ -20,12 +25,12 @@ class ViewPermission extends ViewRecord
     protected function getInfolistSchema(): array
     {
         return [
-            \Filament\Infolists\Components\Section::make('Permission Information')
+            Section::make('Permission Information')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('name'),
-                    \Filament\Infolists\Components\TextEntry::make('slug'),
-                    \Filament\Infolists\Components\TextEntry::make('description'),
-                    \Filament\Infolists\Components\BadgeEntry::make('group')
+                    TextEntry::make('name'),
+                    TextEntry::make('slug'),
+                    TextEntry::make('description'),
+                    TextColumn::make('group')
                         ->colors([
                             'users' => 'blue',
                             'roles' => 'green',
@@ -35,53 +40,54 @@ class ViewPermission extends ViewRecord
                             'reports' => 'pink',
                             'settings' => 'gray',
                             'system' => 'red',
-                        ]),
+                        ])
+                        ->badge(),
                     \Filament\Infolists\Components\ColorEntry::make('color'),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Statistics')
+            Section::make('Statistics')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('roles_count')
+                    TextEntry::make('roles_count')
                         ->label('Roles')
-                        ->getStateUsing(fn ($record) => $record->roles()->count()),
-                    \Filament\Infolists\Components\TextEntry::make('users_count')
+                        ->getStateUsing(fn($record) => $record->roles()->count()),
+                    TextEntry::make('users_count')
                         ->label('Users')
-                        ->getStateUsing(fn ($record) => $record->users()->count()),
-                    \Filament\Infolists\Components\IconEntry::make('is_system')
+                        ->getStateUsing(fn($record) => $record->users()->count()),
+                    IconEntry::make('is_system')
                         ->label('System')
                         ->boolean(),
-                    \Filament\Infolists\Components\IconEntry::make('is_active')
+                    IconEntry::make('is_active')
                         ->label('Active')
                         ->boolean(),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Roles with this Permission')
+            Section::make('Roles with this Permission')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('roles.name')
+                    TextEntry::make('roles.name')
                         ->label('Roles')
                         ->badge()
-                        ->getStateUsing(fn ($record) => $record->roles->pluck('name'))
+                        ->getStateUsing(fn($record) => $record->roles->pluck('name'))
                         ->columnSpanFull(),
                 ])
-                ->visible(fn ($record) => $record->roles()->count() > 0),
+                ->visible(fn($record) => $record->roles()->count() > 0),
 
-            \Filament\Infolists\Components\Section::make('Users with this Permission')
+            Section::make('Users with this Permission')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('users.name')
+                    TextEntry::make('users.name')
                         ->label('Users')
                         ->badge()
-                        ->getStateUsing(fn ($record) => $record->users->pluck('name'))
+                        ->getStateUsing(fn($record) => $record->users->pluck('name'))
                         ->columnSpanFull(),
                 ])
-                ->visible(fn ($record) => $record->users()->count() > 0),
+                ->visible(fn($record) => $record->users()->count() > 0),
 
-            \Filament\Infolists\Components\Section::make('Timestamps')
+            Section::make('Timestamps')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('created_at')
+                    TextEntry::make('created_at')
                         ->dateTime(),
-                    \Filament\Infolists\Components\TextEntry::make('updated_at')
+                    TextEntry::make('updated_at')
                         ->dateTime(),
                 ])
                 ->columns(2),

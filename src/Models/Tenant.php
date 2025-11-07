@@ -64,4 +64,12 @@ class Tenant extends TenantCore
     {
         return $this->hasMany(Subscription::class);
     }
+
+    /**
+     * Get all invoices for this tenant.
+     */
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(\AngelitoSystems\FilamentTenancy\Models\Invoice::class);
+    }
 }

@@ -34,6 +34,7 @@ class Plan extends Model
         'limits',
         'is_active',
         'sort_order',
+        'metadata',
     ];
 
     /**
@@ -45,6 +46,7 @@ class Plan extends Model
         'price' => 'decimal:2',
         'features' => 'array',
         'limits' => 'array',
+        'metadata' => 'array',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
         'deleted_at' => 'datetime',

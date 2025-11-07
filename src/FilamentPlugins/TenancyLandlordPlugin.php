@@ -11,7 +11,16 @@ use AngelitoSystems\FilamentTenancy\Resources\SubscriptionResource;
 use AngelitoSystems\FilamentTenancy\Resources\RoleResource;
 use AngelitoSystems\FilamentTenancy\Resources\PermissionResource;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource;
+use AngelitoSystems\FilamentTenancy\Resources\PayPalSettingsResource;
+use AngelitoSystems\FilamentTenancy\Resources\SellerResource;
+use AngelitoSystems\FilamentTenancy\Resources\CommissionResource;
+use AngelitoSystems\FilamentTenancy\Resources\InvoiceResource;
 use AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher;
+use AngelitoSystems\FilamentTenancy\Resources\UsersResource;
+use AngelitoSystems\FilamentTenancy\Widgets\StatsOverviewWidget;
+use AngelitoSystems\FilamentTenancy\Widgets\TenantsChartWidget;
+use AngelitoSystems\FilamentTenancy\Widgets\SubscriptionsChartWidget;
+use Filament\Actions\Action;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Illuminate\Support\Facades\Route;
@@ -52,24 +61,30 @@ class TenancyLandlordPlugin implements Plugin
         // Configure panel for landlord context
         $panel->brandName(config('app.name', 'Landlord Panel'));
 
-        // Add language switcher if enabled
-        if (config('filament-tenancy.localization.enabled', true) && 
-            config('filament-tenancy.localization.show_language_switcher', true)) {
-            
-            $panel->userMenuItems($this->getLanguageMenuItems());
-        }
-
         // Note: In Filament 4, database connection is handled at model level, not panel level
         // The default Laravel connection will be used automatically
+
+        if (
+            config('filament-tenancy.localization.enabled', true) &&
+            config('filament-tenancy.localization.show_language_switcher', true)
+        ) {
+
+            $panel->userMenuItems($this->getLanguageMenuItems());
+        }
 
         // Register landlord-specific resources
         if ($this->autoRegister) {
             $panel->resources([
                 TenantResource::class,
+                PayPalSettingsResource::class,
                 PlanResource::class,
                 SubscriptionResource::class,
+                InvoiceResource::class,
+                SellerResource::class,
+                CommissionResource::class,
                 RoleResource::class,
                 PermissionResource::class,
+                UsersResource::class,
                 ...$this->resources,
             ]);
         }
@@ -77,6 +92,15 @@ class TenancyLandlordPlugin implements Plugin
         // Register landlord-specific pages
         if (!empty($this->pages)) {
             $panel->pages($this->pages);
+        }
+
+        // Register landlord-specific widgets
+        if ($this->autoRegister) {
+            $panel->widgets([
+                StatsOverviewWidget::class,
+                TenantsChartWidget::class,
+                SubscriptionsChartWidget::class,
+            ]);
         }
     }
 
@@ -91,22 +115,24 @@ class TenancyLandlordPlugin implements Plugin
         Tenancy::switchToCentral();
     }
 
+
+
     /**
      * Get language menu items for the user menu.
      */
     protected function getLanguageMenuItems(): array
     {
         $currentLocale = LanguageSwitcher::getCurrentLocale();
-        
+
         // Solo mostrar el idioma opuesto al actual
         if ($currentLocale === 'es') {
             return [
-                'language_en' => \Filament\Navigation\MenuItem::make('English')
+                'language_en' => Action::make('English')
                     ->label('🇺🇸 English')
                     ->icon('heroicon-o-language')
-                    ->url(fn() => Route::has('language.switch') 
-                        ? route('language.switch', 'en') 
-                        : (Route::has('language.switch.alt') 
+                    ->url(fn() => Route::has('language.switch')
+                        ? route('language.switch', 'en')
+                        : (Route::has('language.switch.alt')
                             ? route('language.switch.alt', 'en')
                             : (Route::has('language.switch.post')
                                 ? route('language.switch.post', 'en')
@@ -114,12 +140,12 @@ class TenancyLandlordPlugin implements Plugin
             ];
         } else {
             return [
-                'language_es' => \Filament\Navigation\MenuItem::make('Español')
+                'language_es' => Action::make('Español')
                     ->label('🇪🇸 Español')
                     ->icon('heroicon-o-language')
-                    ->url(fn() => Route::has('language.switch') 
-                        ? route('language.switch', 'es') 
-                        : (Route::has('language.switch.alt') 
+                    ->url(fn() => Route::has('language.switch')
+                        ? route('language.switch', 'es')
+                        : (Route::has('language.switch.alt')
                             ? route('language.switch.alt', 'es')
                             : (Route::has('language.switch.post')
                                 ? route('language.switch.post', 'es')
@@ -171,7 +197,7 @@ class TenancyLandlordPlugin implements Plugin
     {
         // Auto-discover and register landlord resources
         $landlordResourcesPath = config('filament-tenancy.landlord_resources_path');
-        
+
         if ($landlordResourcesPath && is_dir($landlordResourcesPath)) {
             $this->discoverResources($panel, $landlordResourcesPath);
         }
@@ -183,14 +209,16 @@ class TenancyLandlordPlugin implements Plugin
     protected function discoverResources(Panel $panel, string $path): void
     {
         $files = glob($path . '/*.php');
-        
+
         foreach ($files as $file) {
             $className = $this->getClassNameFromFile($file);
-            
-            if ($className && 
-                class_exists($className) && 
-                is_subclass_of($className, \Filament\Resources\Resource::class)) {
-                
+
+            if (
+                $className &&
+                class_exists($className) &&
+                is_subclass_of($className, \Filament\Resources\Resource::class)
+            ) {
+
                 $panel->resources([$className]);
             }
         }
@@ -202,14 +230,15 @@ class TenancyLandlordPlugin implements Plugin
     protected function getClassNameFromFile(string $file): ?string
     {
         $content = file_get_contents($file);
-        
-        if (preg_match('/namespace\s+([^;]+);/', $content, $namespaceMatches) &&
-            preg_match('/class\s+(\w+)/', $content, $classMatches)) {
-            
+
+        if (
+            preg_match('/namespace\s+([^;]+);/', $content, $namespaceMatches) &&
+            preg_match('/class\s+(\w+)/', $content, $classMatches)
+        ) {
+
             return $namespaceMatches[1] . '\\' . $classMatches[1];
         }
-        
+
         return null;
     }
 }
-

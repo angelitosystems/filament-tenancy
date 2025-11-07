@@ -4,7 +4,10 @@ namespace AngelitoSystems\FilamentTenancy\Resources\RoleResource\Pages;
 
 use AngelitoSystems\FilamentTenancy\Resources\RoleResource;
 use Filament\Actions;
+use Filament\Infolists\Components\ColorEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
 
 class ViewRole extends ViewRecord
 {
@@ -20,49 +23,49 @@ class ViewRole extends ViewRecord
     protected function getInfolistSchema(): array
     {
         return [
-            \Filament\Infolists\Components\Section::make('Role Information')
+            Section::make('Role Information')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('name'),
-                    \Filament\Infolists\Components\TextEntry::make('slug'),
-                    \Filament\Infolists\Components\TextEntry::make('description'),
-                    \Filament\Infolists\Components\ColorEntry::make('color'),
+                    TextEntry::make('name'),
+                    TextEntry::make('slug'),
+                    TextEntry::make('description'),
+                    ColorEntry::make('color'),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Statistics')
+            Section::make('Statistics')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('permissions_count')
+                    TextEntry::make('permissions_count')
                         ->label('Permissions')
                         ->getStateUsing(fn ($record) => $record->permissions()->count()),
-                    \Filament\Infolists\Components\TextEntry::make('users_count')
+                    TextEntry::make('users_count')
                         ->label('Users')
                         ->getStateUsing(fn ($record) => $record->users()->count()),
                 ])
                 ->columns(2),
 
-            \Filament\Infolists\Components\Section::make('Permissions')
+            Section::make('Permissions')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('permissions.name')
+                    TextEntry::make('permissions.name')
                         ->label('Permissions')
                         ->badge()
                         ->getStateUsing(fn ($record) => $record->permissions->pluck('name'))
                         ->columnSpanFull(),
                 ]),
 
-            \Filament\Infolists\Components\Section::make('Users with this Role')
-                ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('users.name')
+            Section::make('Users with this Role')
+                ->schema([  
+                    TextEntry::make('users.name')
                         ->label('Users')
                         ->getStateUsing(fn ($record) => $record->users->pluck('name'))
                         ->columnSpanFull(),
                 ])
                 ->visible(fn ($record) => $record->users()->count() > 0),
 
-            \Filament\Infolists\Components\Section::make('Timestamps')
+            Section::make('Timestamps')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('created_at')
+                    TextEntry::make('created_at')
                         ->dateTime(),
-                    \Filament\Infolists\Components\TextEntry::make('updated_at')
+                    TextEntry::make('updated_at')
                         ->dateTime(),
                 ])
                 ->columns(2),

@@ -19,6 +19,7 @@ A comprehensive multi-tenancy package for Filament with support for multiple dat
 - **📈 Performance monitoring** - Real-time metrics and connection monitoring
 - **🔌 Connection pooling** - Optimized database connection management
 - **💳 Plans & Subscriptions** - Built-in plan and subscription management
+- **💳 PayPal Integration** - Complete PayPal payment integration with webhooks support
 - **🛡️ Database compatibility check** - Automatic validation of database requirements
 - **🧹 Smart error handling** - Automatic retry and cleanup on connection errors
 - **🌐 APP_DOMAIN Auto-Detection** - Automatic domain detection from APP_URL for subdomain tenancy
@@ -774,6 +775,12 @@ php artisan tenant:fresh
 # Monitor tenant connections
 php artisan filament-tenancy:monitor-connections
 ```
+
+## Documentation
+
+### Additional Guides
+
+- **[PayPal Configuration Guide](docs/PAYPAL_CONFIGURATION.md)** - Complete guide for setting up PayPal payment integration, including webhooks, credentials, and troubleshooting.
 
 ## Credits
 

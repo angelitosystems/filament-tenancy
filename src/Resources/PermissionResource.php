@@ -3,7 +3,9 @@
 namespace AngelitoSystems\FilamentTenancy\Resources;
 
 use AngelitoSystems\FilamentTenancy\Models\Permission;
+use AngelitoSystems\FilamentTenancy\Traits\HasResourceAuthorization;
 use AngelitoSystems\FilamentTenancy\Traits\HasSimpleTranslations;
+use AngelitoSystems\FilamentTenancy\Traits\ChecksSubscriptionRestrictions;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -19,7 +21,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ColorColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -31,14 +32,16 @@ use Filament\Tables\Table;
 class PermissionResource extends Resource
 {
     use HasSimpleTranslations;
-
+    use HasResourceAuthorization;
+    use ChecksSubscriptionRestrictions;
+    
     protected static ?string $model = Permission::class;
 
     protected static ?string $slug = 'permissions';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -67,7 +70,55 @@ class PermissionResource extends Resource
 
     public static function getNavigationGroupKey(): ?string
     {
-        return 'admin_management';
+        return 'user_management';
+    }
+
+    protected static function getNavigationGroupLabel(): ?string
+    {
+        return 'user_management';
+    }
+
+    /**
+     * Define permisos y roles para autorización
+     */
+    protected static function getAccessPermissions(): array
+    {
+        return ['manage permissions', 'view permissions'];
+    }
+
+    protected static function getAccessRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getCreatePermissions(): array
+    {
+        return ['create permissions', 'manage permissions'];
+    }
+
+    protected static function getCreateRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getEditPermissions(): array
+    {
+        return ['edit permissions', 'manage permissions'];
+    }
+
+    protected static function getEditRoles(): array
+    {
+        return ['admin'];
+    }
+
+    protected static function getDeletePermissions(): array
+    {
+        return ['delete permissions', 'manage permissions'];
+    }
+
+    protected static function getDeleteRoles(): array
+    {
+        return ['admin'];
     }
 
     public static function form(Schema $form): Schema
@@ -232,14 +283,14 @@ class PermissionResource extends Resource
                     ->query(fn($query) => $query->doesntHave('users'))
                     ->label('No Users'),
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make()
                     ->requiresConfirmation()
                     ->hidden(fn($record) => $record->is_system),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->requiresConfirmation()

@@ -3,11 +3,19 @@
 namespace AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource\Pages;
 
 use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource\Widgets\CurrentSubscriptionWidget;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPlans extends ListRecords
 {
     protected static string $resource = PlanResource::class;
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            CurrentSubscriptionWidget::class,
+        ];
+    }
 
     protected function getHeaderActions(): array
     {
@@ -18,13 +26,6 @@ class ListPlans extends ListRecords
 
     public function getTitle(): string
     {
-        return 'Available Plans';
-    }
-
-    protected function getHeaderWidgets(): array
-    {
-        return [
-            \AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource\Widgets\CurrentSubscriptionWidget::class,
-        ];
+        return PlanResource::__('available_plans');
     }
 }

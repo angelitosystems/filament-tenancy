@@ -3,6 +3,7 @@
 namespace AngelitoSystems\FilamentTenancy\Resources;
 
 use AngelitoSystems\FilamentTenancy\Models\Role;
+use AngelitoSystems\FilamentTenancy\Traits\HasResourceAuthorization;
 use AngelitoSystems\FilamentTenancy\Traits\HasSimpleTranslations;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
@@ -10,12 +11,10 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\ColorPicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Set;
@@ -26,12 +25,13 @@ use Filament\Tables\Table;
 class RoleResource extends Resource
 {
     use HasSimpleTranslations;
+    use HasResourceAuthorization;
 
     protected static ?string $model = Role::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-shield-check';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -59,6 +59,11 @@ class RoleResource extends Resource
     }
 
     public static function getNavigationGroupKey(): ?string
+    {
+        return 'user_management';
+    }
+    
+    protected static function getNavigationGroupLabel(): ?string
     {
         return 'user_management';
     }
@@ -159,7 +164,7 @@ class RoleResource extends Resource
                         'false' => __('tenancy.no_users'),
                     ]),
             ])
-            ->actions([
+            ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make()
@@ -170,7 +175,7 @@ class RoleResource extends Resource
                         }
                     }),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->requiresConfirmation()

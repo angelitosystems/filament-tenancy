@@ -37,6 +37,11 @@ class CentralRolePermissionSeeder extends Seeder
             ['name' => 'manage system settings', 'slug' => 'manage-system-settings', 'description' => 'Gestionar configuración del sistema'],
             ['name' => 'access landlord panel', 'slug' => 'access-landlord-panel', 'description' => 'Acceder al panel landlord'],
             ['name' => 'manage tenant databases', 'slug' => 'manage-tenant-databases', 'description' => 'Gestionar bases de datos de tenants'],
+            ['name' => 'manage sellers', 'slug' => 'manage-sellers', 'description' => 'Gestionar vendedores'],
+            ['name' => 'view sellers', 'slug' => 'view-sellers', 'description' => 'Ver vendedores'],
+            ['name' => 'manage commissions', 'slug' => 'manage-commissions', 'description' => 'Gestionar comisiones'],
+            ['name' => 'view commissions', 'slug' => 'view-commissions', 'description' => 'Ver comisiones'],
+            ['name' => 'view own commissions', 'slug' => 'view-own-commissions', 'description' => 'Ver propias comisiones'],
         ];
 
         foreach ($permissions as $permission) {
@@ -76,6 +81,12 @@ class CentralRolePermissionSeeder extends Seeder
                 'description' => 'Usuario de soporte con permisos limitados',
                 'permissions' => ['view central dashboard', 'access landlord panel']
             ],
+            [
+                'name' => 'Seller',
+                'slug' => 'seller',
+                'description' => 'Vendedor con acceso a sus comisiones',
+                'permissions' => ['view own commissions', 'access landlord panel']
+            ],
         ];
 
         foreach ($roles as $roleData) {
@@ -103,5 +114,6 @@ class CentralRolePermissionSeeder extends Seeder
         $this->command->info('  • Super Admin: Todos los permisos centrales');
         $this->command->info('  • Landlord Admin: Permisos de gestión de tenants');
         $this->command->info('  • Support: Permisos de solo lectura');
+        $this->command->info('  • Seller: Permisos para ver sus propias comisiones');
     }
 }

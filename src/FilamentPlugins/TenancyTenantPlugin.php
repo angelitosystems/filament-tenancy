@@ -8,8 +8,12 @@ use AngelitoSystems\FilamentTenancy\Middleware\InitializeTenancy;
 use AngelitoSystems\FilamentTenancy\Middleware\PreventLandlordAccess;
 use AngelitoSystems\FilamentTenancy\Middleware\SetLocale;
 use AngelitoSystems\FilamentTenancy\Resources\Tenant\RoleResource as TenantRoleResource;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource as TenantPlanResource;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\InvoiceResource as TenantInvoiceResource;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource\Widgets\CurrentSubscriptionWidget;
 use AngelitoSystems\FilamentTenancy\Resources\PermissionResource;
 use AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher;
+use AngelitoSystems\FilamentTenancy\Resources\UsersResource;
 use Filament\Contracts\Plugin;
 use Filament\Panel;
 use Illuminate\Support\Facades\Route;
@@ -54,17 +58,19 @@ class TenancyTenantPlugin implements Plugin
             return $tenant ? $tenant->name : config('app.name');
         });
 
-        // Add language switcher if enabled
-        if (config('filament-tenancy.localization.enabled', true) && 
-            config('filament-tenancy.localization.show_language_switcher', true)) {
-            
-            $panel->userMenuItems($this->getLanguageMenuItems());
-        }
         
         if ($this->autoRegister) {
             $panel->resources([
+                TenantPlanResource::class,
+                TenantInvoiceResource::class,
                 TenantRoleResource::class,
                 PermissionResource::class,
+                UsersResource::class,
+            ]);
+            
+            // Register tenant-specific widgets
+            $panel->widgets([
+                CurrentSubscriptionWidget::class,
             ]);
         }
 

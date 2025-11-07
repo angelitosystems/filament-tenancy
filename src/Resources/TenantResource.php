@@ -4,16 +4,11 @@ namespace AngelitoSystems\FilamentTenancy\Resources;
 
 use AngelitoSystems\FilamentTenancy\Models\Tenant;
 use AngelitoSystems\FilamentTenancy\Resources\TenantResource\Pages;
-use AngelitoSystems\FilamentTenancy\Traits\HasSimpleTranslations;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
@@ -32,7 +27,6 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TenantResource extends Resource
 {
-    use HasSimpleTranslations;
 
     protected static ?string $model = Tenant::class;
 
@@ -48,6 +42,27 @@ class TenantResource extends Resource
     public static function getNavigationKey(): string
     {
         return 'tenants';
+    }
+
+    /**
+     * Example: Customize translation prefix
+     * 
+     * If you want to use custom translation namespace like 'tenant.fields',
+     * uncomment this method:
+     * 
+     * protected static function getTranslationPrefix(): ?string
+     * {
+     *     return 'tenant.fields'; // Will search in 'tenant.fields.{key}'
+     * }
+     * 
+     * The trait will search translations in this order:
+     * 1. Custom prefix: 'tenant.fields.{key}'
+     * 2. Package namespace: 'filament-tenancy::tenancy.{key}'
+     * 3. Default namespace: 'tenancy.{key}'
+     */
+    protected static function getTranslationPrefix(): ?string
+    {
+        return 'tenant.fields'; // Will search in 'tenant.fields.{key}'
     }
 
     public static function getModelKey(): string

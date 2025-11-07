@@ -15,14 +15,16 @@ class PublishAssetsCommand extends Command
     protected $signature = 'filament-tenancy:publish 
                             {--lang : Publicar archivos de idioma}
                             {--docs : Publicar documentación}
-                            {--all : Publicar todos los recursos (idioma y documentación)}';
+                            {--migrations : Publicar migraciones}
+                            {--tenant-migrations : Publicar migraciones de tenant}
+                            {--all : Publicar todos los recursos}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Publicar recursos del paquete Filament Tenancy (idiomas y documentación)';
+    protected $description = 'Publicar recursos del paquete Filament Tenancy (idiomas, documentación y migraciones)';
 
     /**
      * Execute the console command.
@@ -33,16 +35,22 @@ class PublishAssetsCommand extends Command
 
         $publishLang = $this->option('lang') || $this->option('all');
         $publishDocs = $this->option('docs') || $this->option('all');
+        $publishMigrations = $this->option('migrations') || $this->option('all');
+        $publishTenantMigrations = $this->option('tenant-migrations') || $this->option('all');
 
-        if (!$publishLang && !$publishDocs) {
+        if (!$publishLang && !$publishDocs && !$publishMigrations && !$publishTenantMigrations) {
             $this->info('Opciones disponibles:');
-            $this->line('  --lang   : Publicar archivos de idioma');
-            $this->line('  --docs   : Publicar documentación');
-            $this->line('  --all    : Publicar todos los recursos');
+            $this->line('  --lang              : Publicar archivos de idioma');
+            $this->line('  --docs              : Publicar documentación');
+            $this->line('  --migrations        : Publicar migraciones principales');
+            $this->line('  --tenant-migrations : Publicar migraciones de tenant');
+            $this->line('  --all               : Publicar todos los recursos');
             $this->newLine();
             $this->info('Ejemplos:');
             $this->line('  php artisan filament-tenancy:publish --lang');
             $this->line('  php artisan filament-tenancy:publish --docs');
+            $this->line('  php artisan filament-tenancy:publish --migrations');
+            $this->line('  php artisan filament-tenancy:publish --tenant-migrations');
             $this->line('  php artisan filament-tenancy:publish --all');
             return self::SUCCESS;
         }
@@ -56,6 +64,14 @@ class PublishAssetsCommand extends Command
 
         if ($publishDocs) {
             $this->publishDocumentation();
+        }
+
+        if ($publishMigrations) {
+            $this->publishMigrations();
+        }
+
+        if ($publishTenantMigrations) {
+            $this->publishTenantMigrations();
         }
 
         $this->displaySuccessMessage();
@@ -113,6 +129,96 @@ class PublishAssetsCommand extends Command
             $this->newLine();
         } catch (\Exception $e) {
             $this->error('  ✗ Error al publicar archivos de idioma: ' . $e->getMessage());
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Publicar migraciones principales.
+     */
+    protected function publishMigrations(): void
+    {
+        $this->info('📦 Publicando migraciones principales...');
+
+        try {
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-migrations',
+            ]);
+
+            $this->line('  ✓ Migraciones principales publicadas en <fg=green>database/migrations/</fg=green>');
+            
+            // Verificar que las migraciones se publicaron correctamente
+            $migrationsPath = database_path('migrations');
+            if (File::exists($migrationsPath)) {
+                $migrations = File::glob($migrationsPath . '/*_*_*_*_create_*_table.php');
+                $tenancyMigrations = array_filter($migrations, function($file) {
+                    $content = File::get($file);
+                    return strpos($content, 'AngelitoSystems') !== false || 
+                           strpos($content, 'filament-tenancy') !== false ||
+                           strpos($content, 'tenants') !== false ||
+                           strpos($content, 'tenancy') !== false;
+                });
+                
+                if (!empty($tenancyMigrations)) {
+                    $this->line('  📄 Migraciones publicadas:');
+                    foreach ($tenancyMigrations as $migration) {
+                        $fileName = basename($migration);
+                        $this->line("    • <fg=cyan>{$fileName}</fg=cyan>");
+                    }
+                }
+            }
+
+            $this->newLine();
+            $this->info('📚 Próximos pasos:');
+            $this->line('  1. Revisa las migraciones publicadas en <fg=green>database/migrations/</fg=green>');
+            $this->line('  2. Ejecuta las migraciones: <fg=yellow>php artisan migrate</fg=yellow>');
+            $this->line('  3. Personaliza las migraciones según necesites');
+            $this->newLine();
+        } catch (\Exception $e) {
+            $this->error('  ✗ Error al publicar migraciones: ' . $e->getMessage());
+        }
+
+        $this->newLine();
+    }
+
+    /**
+     * Publicar migraciones de tenant.
+     */
+    protected function publishTenantMigrations(): void
+    {
+        $this->info('📦 Publicando migraciones de tenant...');
+
+        try {
+            $this->call('vendor:publish', [
+                '--provider' => 'AngelitoSystems\FilamentTenancy\TenancyServiceProvider',
+                '--tag' => 'filament-tenancy-tenant-migrations',
+            ]);
+
+            $this->line('  ✓ Migraciones de tenant publicadas en <fg=green>database/migrations/tenant/</fg=green>');
+            
+            // Verificar que las migraciones se publicaron correctamente
+            $tenantMigrationsPath = database_path('migrations/tenant');
+            if (File::exists($tenantMigrationsPath)) {
+                $migrations = File::files($tenantMigrationsPath);
+                if (!empty($migrations)) {
+                    $this->line('  📄 Migraciones de tenant publicadas:');
+                    foreach ($migrations as $migration) {
+                        $fileName = $migration->getFilename();
+                        $this->line("    • <fg=cyan>{$fileName}</fg=cyan>");
+                    }
+                }
+            }
+
+            $this->newLine();
+            $this->info('📚 Información importante:');
+            $this->line('  • Estas migraciones se ejecutarán automáticamente cuando crees un tenant');
+            $this->line('  • También puedes ejecutarlas manualmente usando: <fg=yellow>php artisan tenant:migrate</fg=yellow>');
+            $this->line('  • Personaliza las migraciones según necesites para tus tenants');
+            $this->newLine();
+        } catch (\Exception $e) {
+            $this->error('  ✗ Error al publicar migraciones de tenant: ' . $e->getMessage());
         }
 
         $this->newLine();
@@ -227,6 +333,8 @@ class PublishAssetsCommand extends Command
         $this->info('📖 Para más ayuda:');
         $this->line('  • Documentación: <fg=green>docs/filament-tenancy/</fg=green>');
         $this->line('  • Idiomas: <fg=green>resources/lang/vendor/filament-tenancy/</fg=green>');
+        $this->line('  • Migraciones: <fg=green>database/migrations/</fg=green>');
+        $this->line('  • Migraciones tenant: <fg=green>database/migrations/tenant/</fg=green>');
         $this->line('  • Comandos disponibles: <fg=yellow>php artisan list | findstr filament-tenancy</fg=yellow>');
         $this->newLine();
     }

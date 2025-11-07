@@ -3,6 +3,7 @@
 namespace AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource\Widgets;
 
 use AngelitoSystems\FilamentTenancy\Facades\Tenancy;
+use AngelitoSystems\FilamentTenancy\Resources\Tenant\PlanResource;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
@@ -12,12 +13,12 @@ class CurrentSubscriptionWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $tenant = Tenancy::currentTenant();
+        $tenant = Tenancy::current();
         
         if (!$tenant) {
             return [
-                Stat::make('Current Plan', 'No Tenant')
-                    ->description('No active tenant found')
+                Stat::make(static::__('current_plan'), static::__('no_tenant'))
+                    ->description(static::__('no_active_tenant_found'))
                     ->color('danger'),
             ];
         }
@@ -26,26 +27,38 @@ class CurrentSubscriptionWidget extends BaseWidget
 
         if (!$subscription) {
             return [
-                Stat::make('Current Plan', 'No Active Subscription')
-                    ->description('Subscribe to a plan to get started')
+                Stat::make(static::__('current_plan'), static::__('no_active_subscription'))
+                    ->description(static::__('subscribe_to_get_started'))
                     ->color('warning')
-                    ->action('View Available Plans'),
+                    ->url(fn() => PlanResource::getUrl('index')),
             ];
         }
 
-        return [
-            Stat::make('Current Plan', $subscription->plan->name)
-                ->description($subscription->plan->billing_cycle)
-                ->color('success')
-                ->icon('heroicon-o-credit-card'),
+        $plan = $subscription->plan;
+        $billingCycleLabel = static::__($subscription->billing_cycle) ?? ucfirst($subscription->billing_cycle);
 
-            Stat::make('Status', ucfirst($subscription->status))
-                ->description($subscription->auto_renew ? 'Auto-renew enabled' : 'Auto-renew disabled')
+        return [
+            Stat::make(static::__('current_plan'), $plan->name ?? static::__('no_plan'))
+                ->description($billingCycleLabel)
+                ->color('success')
+                ->icon('heroicon-o-credit-card')
+                ->url(fn() => PlanResource::getUrl('view', ['record' => $plan->id])),
+
+            Stat::make(static::__('status'), ucfirst(static::__("status_{$subscription->status}") ?? $subscription->status))
+                ->description($subscription->auto_renew ? static::__('auto_renew_enabled') : static::__('auto_renew_disabled'))
                 ->color($subscription->status === 'active' ? 'success' : 'warning'),
 
-            Stat::make('Next Billing', $subscription->next_billing_at?->format('M d, Y') ?? 'Lifetime')
-                ->description($subscription->ends_at ? 'Expires: ' . $subscription->ends_at->format('M d, Y') : 'No expiration')
+            Stat::make(static::__('next_billing'), $subscription->next_billing_at?->format('M d, Y') ?? static::__('lifetime'))
+                ->description($subscription->ends_at ? static::__('expires_on') . ': ' . $subscription->ends_at->format('M d, Y') : static::__('no_expiration'))
                 ->color($subscription->ends_at && $subscription->ends_at->isPast() ? 'danger' : 'primary'),
         ];
+    }
+
+    /**
+     * Get translation for widget
+     */
+    protected static function __(string $key, array $replace = [], ?string $locale = null): string
+    {
+        return PlanResource::__($key, $replace, $locale);
     }
 }

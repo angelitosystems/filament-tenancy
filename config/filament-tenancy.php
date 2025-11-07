@@ -745,4 +745,132 @@ return [
         'register_middleware' => env('TENANCY_PERMISSIONS_MIDDLEWARE', true),
         'auto_seed' => env('TENANCY_PERMISSIONS_AUTO_SEED', true),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | PayPal Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for PayPal payment integration.
+    |
+    */
+    'paypal' => [
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Mode
+        |--------------------------------------------------------------------------
+        |
+        | Set to 'sandbox' for testing or 'live' for production.
+        |
+        */
+        'mode' => env('PAYPAL_MODE', 'sandbox'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Client ID
+        |--------------------------------------------------------------------------
+        |
+        | Your PayPal application Client ID.
+        |
+        */
+        'client_id' => env('PAYPAL_CLIENT_ID'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Client Secret
+        |--------------------------------------------------------------------------
+        |
+        | Your PayPal application Client Secret.
+        |
+        */
+        'client_secret' => env('PAYPAL_CLIENT_SECRET'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Currency
+        |--------------------------------------------------------------------------
+        |
+        | Default currency for PayPal payments.
+        |
+        */
+        'currency' => env('PAYPAL_CURRENCY', 'USD'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Webhook URL
+        |--------------------------------------------------------------------------
+        |
+        | The URL where PayPal will send webhook notifications.
+        | This should be set in your PayPal dashboard.
+        |
+        */
+        'webhook_url' => env('PAYPAL_WEBHOOK_URL', '/paypal/webhook'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Webhook Secret
+        |--------------------------------------------------------------------------
+        |
+        | Secret key for verifying PayPal webhook signatures.
+        | Get this from your PayPal dashboard.
+        |
+        */
+        'webhook_secret' => env('PAYPAL_WEBHOOK_SECRET'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Return URL
+        |--------------------------------------------------------------------------
+        |
+        | URL to redirect users after successful payment.
+        |
+        */
+        'return_url' => env('PAYPAL_RETURN_URL', '/paypal/success'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal Cancel URL
+        |--------------------------------------------------------------------------
+        |
+        | URL to redirect users if they cancel the payment.
+        |
+        */
+        'cancel_url' => env('PAYPAL_CANCEL_URL', '/paypal/cancel'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | PayPal API Base URLs
+        |--------------------------------------------------------------------------
+        |
+        | Base URLs for PayPal API endpoints.
+        |
+        */
+        'api_urls' => [
+            'sandbox' => 'https://api-m.sandbox.paypal.com',
+            'live' => 'https://api-m.paypal.com',
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Grace Period Days
+        |--------------------------------------------------------------------------
+        |
+        | Number of days after subscription expiration before tenant is
+        | automatically deactivated. During this period, tenant remains active
+        | but access may be limited.
+        |
+        */
+        'grace_period_days' => env('PAYPAL_GRACE_PERIOD_DAYS', 7),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Auto Generate Payment Link
+        |--------------------------------------------------------------------------
+        |
+        | Whether to automatically generate payment link when creating a
+        | pending subscription.
+        |
+        */
+        'auto_generate_payment_link' => env('PAYPAL_AUTO_GENERATE_PAYMENT_LINK', false),
+    ],
 ];

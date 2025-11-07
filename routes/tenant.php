@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use AngelitoSystems\FilamentTenancy\Components\LanguageSwitcher;
+use AngelitoSystems\FilamentTenancy\Http\Controllers\InvoicePdfController;
 
 Route::get('/language/{locale}', function (string $locale) {
     \Log::info('Language switch route called', [
@@ -21,3 +22,12 @@ Route::get('/language/{locale}', function (string $locale) {
     
     return redirect()->back();
 })->name('language.switch');
+
+// Invoice PDF routes
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/invoices/{invoice}/pdf/download', [InvoicePdfController::class, 'generate'])
+        ->name('tenant.invoices.pdf.download');
+    
+    Route::get('/invoices/{invoice}/pdf/view', [InvoicePdfController::class, 'view'])
+        ->name('tenant.invoices.pdf.view');
+});
